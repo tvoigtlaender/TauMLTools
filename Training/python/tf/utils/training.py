@@ -7,23 +7,59 @@ import tensorflow as tf
 from tensorflow.python.ops import math_ops, array_ops
 import numpy as np
 import mlflow
+import os
 
-def compose_datasets(datasets, tf_dataset_cfg, input_dataset_cfg):
+def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
+    if n_gpu < 1:
+        global_batch_multiplier = 1
+    else:
+        global_batch_multiplier = n_gpu
+
     if tf_dataset_cfg['combine_via'] == 'sampling': # compose final dataset as sampling from the set of loaded input TF datasets
         datasets_for_training, sample_probas = _combine_datasets(datasets, load=True), None
         train_data = tf.data.Dataset.sample_from_datasets(datasets=datasets_for_training['train'], weights=sample_probas, seed=1234, stop_on_empty_dataset=False) # True so that the last batches are not purely of one class
         val_data = tf.data.Dataset.sample_from_datasets(datasets=datasets_for_training['val'], seed=1234, stop_on_empty_dataset=False)
     elif tf_dataset_cfg['combine_via'] == 'interleave': # compose final dataset as consecutive (cycle_length=1) loading of input TF datasets
+        # NOTE: it is necessary to overwrite the reader_func of the loader if used in combination with interleave 
+        #   as both the load function AND the interleave function attempt to use all available cores otherwise. 
+        #   This leads to an exponential creation of threads for machines with many cores,
         datasets_for_training = _combine_datasets(datasets, load=False)
-        element_spec = tf.data.Dataset.load(datasets_for_training['train'][0], compression='GZIP').element_spec
+        element_spec = tf.data.Dataset.load(
+            datasets_for_training['train'][0], 
+            compression='GZIP',
+            reader_func=lambda dataset: dataset.interleave(
+                lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
+            ).element_spec
+        cycle_length = 4 
+        block_length = 1
 
         train_data = tf.data.Dataset.from_tensor_slices(datasets_for_training['train'])
-        train_data = train_data.interleave(lambda x: tf.data.Dataset.load(x, element_spec=element_spec, compression='GZIP'),
-                                                cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
+        train_data = train_data.interleave(
+            lambda x: tf.data.Dataset.load(
+                x, 
+                element_spec=element_spec, 
+                compression='GZIP',
+                reader_func=lambda dataset: dataset.interleave(
+                    lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
+                ),
+            cycle_length=cycle_length, 
+            num_parallel_calls=tf.data.AUTOTUNE, 
+            deterministic=False, 
+            block_length=block_length)
 
         val_data = tf.data.Dataset.from_tensor_slices(datasets_for_training['val'])
-        val_data = val_data.interleave(lambda x: tf.data.Dataset.load(x, element_spec=element_spec, compression='GZIP'),
-                                                cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
+        val_data = val_data.interleave(
+            lambda x: tf.data.Dataset.load(
+                x, 
+                element_spec=element_spec, 
+                compression='GZIP',
+                reader_func=lambda dataset: dataset.interleave(
+                    lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
+                ),
+            cycle_length=cycle_length, 
+            num_parallel_calls=tf.data.AUTOTUNE, 
+            deterministic=False, 
+            block_length=block_length)
     else:
         raise ValueError("`combine_via` should be either 'sampling' or 'interleave'")
 
@@ -35,10 +71,10 @@ def compose_datasets(datasets, tf_dataset_cfg, input_dataset_cfg):
 
     # batch/smart batch
     if tf_dataset_cfg['smart_batching_step'] is None:
-        train_data = train_data.batch(tf_dataset_cfg["train_batch_size"])
-        val_data = val_data.batch(tf_dataset_cfg["val_batch_size"])
+        train_data = train_data.batch(tf_dataset_cfg["train_batch_size"] * global_batch_multiplier)
+        val_data = val_data.batch(tf_dataset_cfg["val_batch_size"] * global_batch_multiplier)
     else:
-        train_data, val_data = _smart_batch(train_data, val_data, tf_dataset_cfg)
+        train_data, val_data = _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
         
     # prefetch
     train_data = train_data.prefetch(tf.data.experimental.AUTOTUNE)
@@ -65,12 +101,18 @@ def _combine_datasets(datasets, load=False):
         if dataset_type not in datasets:
             raise RuntimeError(f'key ({dataset_type}) should be present in dataset yaml configuration')
         for dataset_name, dataset_cfg in datasets[dataset_type].items(): # loop over specified train/val datasets
-            for p in glob(f'{dataset_cfg["path_to_dataset"]}/{dataset_name}/{dataset_type}/*/'): # loop over all globbed files in the dataset
+            for p in glob(
+                '{}/{}/{}/*/'.format(
+                    dataset_cfg["path_to_dataset"].format(HOME=os.getenv("HOME")),
+                    dataset_name,
+                    dataset_type,
+                )
+            ): # loop over all globbed files in the dataset
                 if load:
                     _dataset = tf.data.Dataset.load(p, compression='GZIP')
                     datasets_for_training[dataset_type].append(_dataset) 
                 else:   
-                    datasets_for_training[dataset_type].append(p)    
+                    datasets_for_training[dataset_type].append(p)
     return datasets_for_training
 
 def _combine_for_sampling(datasets):
@@ -85,7 +127,7 @@ def _combine_for_sampling(datasets):
         for dataset_name, dataset_cfg in datasets[dataset_type].items(): # loop over specified train/val datasets
             for tau_type in dataset_cfg["tau_types"]: # loop over tau types specified for this dataset
                 for p in glob(f'{dataset_cfg["path_to_dataset"]}/{dataset_name}/{dataset_type}/*/{tau_type}'): # loop over all globbed files in the dataset
-                    dataset = tf.data.experimental.load(p) 
+                    dataset = tf.data.load(p) 
                     ds_per_tau_type[tau_type].append(dataset) # add TF dataset (1 input file, 1 tau type) to the map  
         
         n_tau_types = len(ds_per_tau_type.keys())
@@ -97,7 +139,18 @@ def _combine_for_sampling(datasets):
     
     return datasets_for_training, sample_probas
 
-def _smart_batch(train_data, val_data, tf_dataset_cfg):
+def _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
+    
+    # will do smart batching based only on the sequence lengths of the **first** element (assume it to be PF candidate block)
+    # NB: careful when dropping whole blocks in `embedding.yaml` -> change smart batching id here accordingly
+    element_length_func = lambda *elements: tf.shape(elements[0])[0]
+
+    bucket_boundaries = np.arange(
+        tf_dataset_cfg['sequence_length_dist_start'],
+        tf_dataset_cfg['sequence_length_dist_end'],
+        tf_dataset_cfg['smart_batching_step']
+    )
+    
     def _element_to_bucket_id(*args):
         seq_length = element_length_func(*args)
 
@@ -108,33 +161,22 @@ def _smart_batch(train_data, val_data, tf_dataset_cfg):
         math_ops.less_equal(buckets_min, seq_length),
         math_ops.less(seq_length, buckets_max))
         bucket_id = math_ops.reduce_min(array_ops.where(conditions_c))
-
         return bucket_id
-
+    
     def _reduce_func(unused_arg, dataset, batch_size):
         return dataset.batch(batch_size)
 
-    # will do smart batching based only on the sequence lengths of the **first** element (assume it to be PF candidate block)
-    # NB: careful when dropping whole blocks in `embedding.yaml` -> change smart batching id here accordingly
-    element_length_func = lambda *elements: tf.shape(elements[0])[0]
-
-    bucket_boundaries = np.arange(
-        tf_dataset_cfg['sequence_length_dist_start'],
-        tf_dataset_cfg['sequence_length_dist_end'],
-        tf_dataset_cfg['smart_batching_step']
-    )
-
     train_data = train_data.group_by_window(
         key_func=_element_to_bucket_id,
-        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['train_batch_size']),
-        window_size=tf_dataset_cfg['train_batch_size']
-    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
+        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['train_batch_size'] * global_batch_multiplier),
+        window_size=tf_dataset_cfg['train_batch_size'] * global_batch_multiplier
+    ).shuffle(int(tf_dataset_cfg['shuffle_smart_buffer_size'] / global_batch_multiplier))
 
     val_data = val_data.group_by_window(
         key_func=_element_to_bucket_id,
-        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['val_batch_size']),
-        window_size=tf_dataset_cfg['val_batch_size']
-    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
+        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['val_batch_size'] * global_batch_multiplier),
+        window_size=tf_dataset_cfg['val_batch_size'] * global_batch_multiplier
+    ).shuffle(int(tf_dataset_cfg['shuffle_smart_buffer_size'] / global_batch_multiplier))
 
     return train_data, val_data
 
@@ -150,13 +192,10 @@ def log_to_mlflow(model, cfg):
     mlflow.log_artifacts(f'{path_to_hydra_logs}/{cfg["model"]["name"]}.tf', 'model') # and also to mlflow artifacts
     if cfg["model"]["type"] == 'taco_net':
         print(model.wave_encoder.summary())
-        print(model.wave_decoder.summary())
         summary_list_encoder, summary_list_decoder = [], []
         model.wave_encoder.summary(print_fn=summary_list_encoder.append)
-        model.wave_decoder.summary(print_fn=summary_list_decoder.append)
         summary_encoder, summary_decoder = "\n".join(summary_list_encoder), "\n".join(summary_list_decoder)
         mlflow.log_text(summary_encoder, artifact_file="encoder_summary.txt")
-        mlflow.log_text(summary_decoder, artifact_file="decoder_summary.txt") 
     elif cfg["model"]["type"] == 'transformer':
         print(model.summary())
     elif cfg['model']['type'] == 'particle_net':
