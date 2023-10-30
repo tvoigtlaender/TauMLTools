@@ -20,11 +20,11 @@ mlflow.tensorflow.autolog(log_models=False)
 
 @hydra.main(config_path='configs', config_name='train')
 def main(cfg: DictConfig) -> None:
-
     cpus = tf.config.list_physical_devices('CPU')
     if cpus:
+        cpu_config = cfg["cpu"]
         threads_per_core = 2
-        n_cpus = int(cfg["cores"])
+        n_cpus = int(cpu_config["cores"])
         if not "OMP_NUM_THREADS" in os.environ:
           print('"OMP_NUM_THREADS" is not set defaulting to a maximum of 1 CPU core.')
           cpu_max = 1
@@ -34,8 +34,8 @@ def main(cfg: DictConfig) -> None:
           raise Exception("More CPU cores assigned than available.")
         available_threads = n_cpus * threads_per_core
         print("{} CPUs with a total of {} threads are available.".format(os.getenv("OMP_NUM_THREADS"), available_threads))
-        intra_threads = cfg["intra"]
-        inter_threads = cfg["inter"]
+        intra_threads = cpu_config["intra"]
+        inter_threads = cpu_config["inter"]
         if intra_threads + inter_threads > available_threads:
             raise Exception("More threads assigned ({}, {}) than available ({})".format(
                 intra_threads, inter_threads, available_threads
@@ -47,18 +47,19 @@ def main(cfg: DictConfig) -> None:
 
     gpus = tf.config.list_physical_devices('GPU')
     if gpus:
-        print("Use GPUs {}.".format(cfg['gpu_index']))
+        gpu_config = cfg["gpu"]
+        print("Use GPUs {}.".format(gpu_config['gpu_index']))
         try:
-            use_gpus = cfg['gpu_index']
+            use_gpus = gpu_config['gpu_index']
             if isinstance(use_gpus, int):
                 use_gpus = [use_gpus]
             valid_gpus = [gpu for i_gpu, gpu in enumerate(gpus) if i_gpu in use_gpus]
             tf.config.set_visible_devices(valid_gpus, 'GPU')
             for gpu in valid_gpus:
-                if 'gpu_mem' in cfg.keys():
-                    print("Set device memory limit of {} to {}GB.".format(gpu, cfg['gpu_mem']))
+                if 'gpu_mem' in gpu_config.keys():
+                    print("Set device memory limit of {} to {}GB.".format(gpu, gpu_config['gpu_mem']))
                     tf.config.experimental.set_virtual_device_configuration(gpu,
-                       [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=cfg['gpu_mem']*1024)])
+                       [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=gpu_config['gpu_mem']*1024)])
                 else:
                     tf.config.experimental.set_memory_growth(gpu, True)
             logical_gpus = tf.config.experimental.list_logical_devices('GPU')
@@ -90,8 +91,7 @@ def main(cfg: DictConfig) -> None:
         run_id = active_run.info.run_id
         
         # load cfg used for the dataset composition
-        home = os.getenv("HOME")
-        with open(cfg['input_dataset_cfg'].format(HOME=home), "r") as f:
+        with open(cfg['input_dataset_cfg'], "r") as f:
             input_dataset_cfg = yaml.safe_load(f)
 
         with use_strategy.scope():
@@ -154,9 +154,9 @@ def main(cfg: DictConfig) -> None:
 
             path_to_hydra_logs = HydraConfig.get().run.dir
             tensorboard_logdir = f'{path_to_hydra_logs}/custom_tensorboard_logs'
-            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (10000, 10300))
+            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (100, 300))
 
-            callbacks = [early_stopping, model_checkpoint] #, tensorboard_callback]
+            callbacks = [early_stopping, model_checkpoint, tensorboard_callback]
             if cfg['schedule']=='descrease':
                 callbacks.append(lr_scheduler)
             model.compile(optimizer=opt,

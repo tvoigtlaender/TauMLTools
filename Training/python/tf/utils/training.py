@@ -7,7 +7,6 @@ import tensorflow as tf
 from tensorflow.python.ops import math_ops, array_ops
 import numpy as np
 import mlflow
-import os
 
 def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
     if n_gpu < 1:
@@ -15,14 +14,14 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
     else:
         global_batch_multiplier = n_gpu
 
+    # NOTE: it is necessary to overwrite the reader_func of the loader if used in combination with interleave 
+    #   as both the load function AND the interleave function attempt to use all available cores otherwise. 
+    #   This leads to an exponential creation of threads for machines with many cores,
     if tf_dataset_cfg['combine_via'] == 'sampling': # compose final dataset as sampling from the set of loaded input TF datasets
         datasets_for_training, sample_probas = _combine_datasets(datasets, load=True), None
         train_data = tf.data.Dataset.sample_from_datasets(datasets=datasets_for_training['train'], weights=sample_probas, seed=1234, stop_on_empty_dataset=False) # True so that the last batches are not purely of one class
         val_data = tf.data.Dataset.sample_from_datasets(datasets=datasets_for_training['val'], seed=1234, stop_on_empty_dataset=False)
     elif tf_dataset_cfg['combine_via'] == 'interleave': # compose final dataset as consecutive (cycle_length=1) loading of input TF datasets
-        # NOTE: it is necessary to overwrite the reader_func of the loader if used in combination with interleave 
-        #   as both the load function AND the interleave function attempt to use all available cores otherwise. 
-        #   This leads to an exponential creation of threads for machines with many cores,
         datasets_for_training = _combine_datasets(datasets, load=False)
         element_spec = tf.data.Dataset.load(
             datasets_for_training['train'][0], 
@@ -100,16 +99,22 @@ def _combine_datasets(datasets, load=False):
     for dataset_type in datasets_for_training.keys():
         if dataset_type not in datasets:
             raise RuntimeError(f'key ({dataset_type}) should be present in dataset yaml configuration')
-        for dataset_name, dataset_cfg in datasets[dataset_type].items(): # loop over specified train/val datasets
+        for dataset_name, path_to_dataset in datasets[dataset_type].items(): # loop over specified train/val datasets
             for p in glob(
                 '{}/{}/{}/*/'.format(
-                    dataset_cfg["path_to_dataset"].format(HOME=os.getenv("HOME")),
+                    path_to_dataset,
                     dataset_name,
                     dataset_type,
                 )
             ): # loop over all globbed files in the dataset
                 if load:
-                    _dataset = tf.data.Dataset.load(p, compression='GZIP')
+                    _dataset = tf.data.Dataset.load(
+                        p, 
+                        compression='GZIP',
+                        reader_func=lambda dataset: dataset.interleave(
+                            lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
+                        )
+                    # _dataset = tf.data.Dataset.load(p, compression='GZIP')
                     datasets_for_training[dataset_type].append(_dataset) 
                 else:   
                     datasets_for_training[dataset_type].append(p)
