@@ -187,6 +187,8 @@ action() {
     fi
     local TAU_ML_LIB_DIR=$(cd $(dirname $(which python))/..; pwd)
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TAU_ML_LIB_DIR/lib
+  elif [[ $MODE == *"docker"* ]]; then
+    source /miniforge/bin/activate tau-ml
   else
     source /cvmfs/sft.cern.ch/lcg/views/setupViews.sh LCG_102 x86_64-centos${os_version}-gcc11-opt
     for law_location in /afs/cern.ch/user/m/mrieger/public/law_sw/setup.sh /afs/desy.de/user/r/riegerma/public/law_sw/setup.sh; do

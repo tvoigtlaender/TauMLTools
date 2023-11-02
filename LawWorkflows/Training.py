@@ -8,22 +8,117 @@ import re
 import sys
 import shutil
 import math
+import select
 
 from .framework import Task, HTCondorWorkflow
 import luigi
+from law.util import interruptable_popen
+law.contrib.load("wlcg")
 
 class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
 
     working_dir  = luigi.Parameter(description = 'Path to the working directory.')
-    enable_gpu   = luigi.Parameter(default = True, significant = False, description = 'Required GPU on node.')
-    cuda_memory  = luigi.Parameter(default = 10000, significant = False, description = 'Required CUDA Global Memory (in Mb).')
+    data_dir  = luigi.Parameter(description = 'Path to the data directory.')
+    num_CPUs   = luigi.Parameter(default = "None", significant = False, description = 'Number of requested CPU.')
+    num_GPUs   = luigi.Parameter(default = "None", significant = False, description = 'Number of requested GPU.')
+    accounting_group   = luigi.Parameter(default = "1", significant = False, description = 'Accounting used for TOpAS.')
+    cuda_memory  = luigi.Parameter(default = "None", significant = False, description = 'Amount of necessary device memory.')
     input_cmds   = luigi.Parameter(description = 'Path to the txt file with input commands.')
+    requirements = luigi.Parameter(default=f"(OpSysAndVer =?= \"CentOS7\")", significant = False, description = 'HTCondor requirements')
+    max_disk  = luigi.Parameter(default = 'None', significant = False, description = 'maximum scratch space usage')
+    max_runtime = law.DurationParameter(default=12.0, unit="h", significant=False, description="maximum runtime")
+    max_memory  = luigi.Parameter(default = '2000', significant = False, description = 'maximum RAM usage')
+    docker_image = luigi.Parameter(default='None', significant=False, description='Used docker image')
 
+    comp_facility = luigi.Parameter(default = 'desy-naf', 
+                                    description = 'Computing facility for specific setups e.g: desy-naf, lxplus')
 
-    comp_facility = luigi.Parameter(default = 'desy-naf',
-                        description = 'Computing facility for specific setups e.g: desy-naf, lxplus')
+    def convert_env_to_dict(self, env):
+        my_env = {}
+        for line in env.splitlines():
+            if line.find(" ") < 0:
+                try:
+                    key, value = line.split("=", 1)
+                    my_env[key] = value
+                except ValueError:
+                    pass
+        return my_env
+
+    def set_environment(self, sourcescript, silent=False):
+        if not silent:
+            print("with source script: {}".format(sourcescript))
+        if isinstance(sourcescript, str):
+            sourcescript = [sourcescript]
+        source_command = [
+            "source {};".format(sourcescript) for sourcescript in sourcescript
+        ] + ["env"]
+        source_command_string = " ".join(source_command)
+        code, out, error = interruptable_popen(
+            source_command_string,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            # rich_console=console
+        )
+        if code != 0:
+            print("source returned non-zero exit status {}".format(code))
+            print("Error: {}".format(error))
+            raise Exception("source failed")
+        my_env = self.convert_env_to_dict(out)
+        return my_env
+
+    def run_command_readable(self, command=[], sourcescript=[], run_location=None):
+        """
+        This can be used, to run a command, where you want to read the output while the command is running.
+        redirect both stdout and stderr to the same output.
+        """
+        if command:
+            if isinstance(command, str):
+                command = [command]
+            if sourcescript:
+                run_env = self.set_environment(sourcescript)
+            else:
+                run_env = None
+            logstring = "Running {}".format(command)
+            if run_location:
+                logstring += " from {}".format(run_location)
+            print("--------------------")
+            print(logstring)
+            try:
+                p = subprocess.Popen(
+                    " ".join(command),
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=run_env,
+                    cwd=run_location,
+                    encoding="utf-8",
+                )
+                while True:
+                    reads = [p.stdout.fileno(), p.stderr.fileno()]
+                    ret = select.select(reads, [], [])
+
+                    for fd in ret[0]:
+                        if fd == p.stdout.fileno():
+                            read = p.stdout.readline()
+                            if read != "\n":
+                                print(read.strip())
+                        if fd == p.stderr.fileno():
+                            read = p.stderr.readline()
+                            if read != "\n":
+                                print(read.strip())
+
+                    if p.poll() != None:
+                        break
+                if p.returncode != 0:
+                    raise Exception(f"Error when running {command}.")
+            except Exception as e:
+                raise Exception(f"Error when running {command}.")
+        else:
+            raise Exception("No command provided.")
 
     def htcondor_job_config(self, config, job_num, branches):
+        config.custom_content = []
         main_dir = os.getenv("ANALYSIS_PATH")
         report_dir = str(self.htcondor_output_directory().path)
 
@@ -38,29 +133,56 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         # render_variables are rendered into all files sent with a job
         config.render_variables["analysis_path"] = main_dir
 
-        if bool(self.enable_gpu):
-            config.custom_content.append('Request_GPUs = 1')
-            config.custom_content.append(("requirements",
-                    f"(OpSysAndVer =?= \"CentOS7\") && (CUDAGlobalMemoryMb > {str(self.cuda_memory)})"))
-        else:
-            config.custom_content.append(("requirements", "(OpSysAndVer =?= \"CentOS7\")"))
-
+        full_req = self.requirements
+        if (self.num_GPUs != "None"):
+            if self.comp_facility == "TOpAS":
+                config.custom_content.append(('request_gpus', self.num_GPUs))
+            else:
+                config.custom_content.append(('Request_GPUs', self.num_GPUs))
+            if self.cuda_memory != "None":
+                full_req += " && (GlobalMemoryMb > {})".format(str(self.cuda_memory))
+        config.custom_content.append(("requirements", full_req))
         if self.comp_facility=="desy-naf":
             config.custom_content.append(("+RequestRuntime", int(math.floor(self.max_runtime * 3600)) - 1))
             config.custom_content.append(('RequestMemory', '{}'.format(self.max_memory)))
         elif self.comp_facility=="lxplus":
             config.custom_content.append(("+MaxRuntime", int(math.floor(self.max_runtime * 3600)) - 1))
             config.custom_content.append(('request_memory', '{}'.format(self.max_memory)))
+        elif self.comp_facility == "TOpAS":
+            # Use proxy file located in $X509_USER_PROXY or /tmp/x509up_u$(id) if empty
+            htcondor_user_proxy = law.wlcg.get_vomsproxy_file()
+            config.render_variables["data_dir"] = self.data_dir
+            config.render_variables["comp_facility"] = self.comp_facility
+            config.render_variables["data_dir"] = self.data_dir
+            config.custom_content.append(("x509userproxy", htcondor_user_proxy))
+            config.custom_content.append(('+RemoteJob', 'True'))
+            config.custom_content.append(("+RequestWalltime", int(math.floor(self.max_runtime * 3600)) - 1))
+            for i in ["num_CPUs", "max_memory", "max_disk", "accounting_group", "docker_image"]:
+                if getattr(self, i) == "None":
+                    raise Exception('TOpAS requires a value for {}.'.format(i))
+            config.custom_content.append(('request_cpus', self.num_CPUs))
+            config.custom_content.append(('RequestMemory', '{}'.format(self.max_memory)))
+            config.custom_content.append(('RequestDisk', f'{self.max_disk}'))
+            config.custom_content.append(('accounting_group', self.accounting_group))
+            config.custom_content.append(("universe", "docker"))
+            config.custom_content.append(("docker_image", self.docker_image))
+            os.system("mkdir -p tarballs")
+            os.system("rm tarballs/TauMLTools.tar.gz")
+            os.system("tar --exclude */tarballs/* --exclude */soft/* --exclude data/ --exclude */miniforge/* -czf tarballs/TauMLTools.tar.gz  ../TauMLTools")
+            config.input_files["Tau_tar"] = law.JobInputFile("tarballs/TauMLTools.tar.gz", render=False)
+            config.input_files["bootstrap"] = law.JobInputFile("bootstrap.sh")
         else:
             raise Exception('no specific setups for {self.comp_facility} computing facility')
 
-        config.custom_content.append(("getenv", "true"))
+        if self.comp_facility != "TOpAS":
+            config.custom_content.append(("getenv", "true"))
         config.custom_content.append(('JobBatchName'  , self.batch_name))
 
         config.custom_content.append(("error" , '/'.join([err_dir, 'err_{}.txt'.format(job_num)])))
         config.custom_content.append(("output", '/'.join([out_dir, 'out_{}.txt'.format(job_num)])))
         config.custom_content.append(("log"   , '/'.join([log_dir, 'log_{}.txt'.format(job_num)])))
-
+        config.custom_content.append(("stream_error", "True"))
+        config.custom_content.append(("stream_output", "True"))
         return config
 
     def create_branch_map(self):
@@ -80,22 +202,6 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
     def run(self):
 
         if not os.path.exists(os.path.abspath(self.working_dir)):
-            raise Exception('Working folder {} does not exist'.format(job_folder))
+            raise Exception('Working folder {} does not exist'.format(self.working_dir))
 
-        command = "cd " + self.working_dir + ";\n"\
-                  + self.branch_data
-
-        print ('>> {}'.format(command))
-        proc = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        stdout, stderr = proc.communicate()
-
-        sys.stdout.write(str(stdout) + '\n')
-        sys.stderr.write(str(stderr) + '\n')
-
-        retcode = proc.returncode
-
-        if retcode != 0:
-            raise Exception('job {} return code is {}'.format(self.branch, retcode))
-        else:
-            taskout = self.output()
-            taskout.dump('Task ended with code %s\n' %retcode)
+        self.run_command_readable(self.branch_data, run_location=self.working_dir)
