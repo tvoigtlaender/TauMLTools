@@ -171,10 +171,6 @@ def main(cfg: DictConfig) -> None:
         mlflow.log_param('run_id', run_id)
         mlflow.log_artifacts(checkpoint_path, "checkpoints")
         shutil.rmtree(checkpoint_path)
-        try:
-            mlflow.log_artifacts(tensorboard_logdir, 'custom_tensorboard_logs')
-        except:
-            pass
 
         print(f'\nTraining has finished! Corresponding MLflow experiment name (ID): {cfg["experiment_name"]}({run_kwargs["experiment_id"]}), and run ID: {run_id}\n')
 

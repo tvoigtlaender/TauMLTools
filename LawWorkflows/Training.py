@@ -10,7 +10,7 @@ import shutil
 import math
 import select
 
-from .framework import Task, HTCondorWorkflow
+from .framework import Task, HTCondorWorkflow, startup_time
 import luigi
 from law.util import interruptable_popen
 law.contrib.load("wlcg")
@@ -32,6 +32,17 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
 
     comp_facility = luigi.Parameter(default = 'desy-naf', 
                                     description = 'Computing facility for specific setups e.g: desy-naf, lxplus')
+
+    # Redirect location of job files to <local_path>/"files"/...
+    def htcondor_create_job_file_factory(self):
+        jobdir = self.local_path("files")
+        print("HELP", jobdir)
+        os.makedirs(jobdir, exist_ok=True)
+        factory = super(HTCondorWorkflow, self).htcondor_create_job_file_factory(
+            dir=jobdir,
+            mkdtemp=False,
+        )
+        return factory
 
     def convert_env_to_dict(self, env):
         my_env = {}
@@ -168,16 +179,16 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
             config.custom_content.append(("docker_image", self.docker_image))
             os.system("mkdir -p tarballs")
             os.system("rm tarballs/TauMLTools.tar.gz")
-            os.system("tar --exclude */tarballs/* --exclude */soft/* --exclude data/ --exclude */miniforge/* -czf tarballs/TauMLTools.tar.gz  ../TauMLTools")
+            os.system('tar --exclude={"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__"} -czf tarballs/TauMLTools.tar.gz  ../TauMLTools')
             config.input_files["Tau_tar"] = law.JobInputFile("tarballs/TauMLTools.tar.gz", render=False)
-            config.input_files["bootstrap"] = law.JobInputFile("bootstrap.sh")
+            config.output_files.append("mlruns.tar.gz")
         else:
             raise Exception('no specific setups for {self.comp_facility} computing facility')
 
         if self.comp_facility != "TOpAS":
             config.custom_content.append(("getenv", "true"))
+        config.render_variables["LOCAL_TIMESTAMP"] = startup_time
         config.custom_content.append(('JobBatchName'  , self.batch_name))
-
         config.custom_content.append(("error" , '/'.join([err_dir, 'err_{}.txt'.format(job_num)])))
         config.custom_content.append(("output", '/'.join([out_dir, 'out_{}.txt'.format(job_num)])))
         config.custom_content.append(("log"   , '/'.join([log_dir, 'log_{}.txt'.format(job_num)])))
@@ -200,8 +211,17 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         return self.local_target("empty_file_{}.txt".format(self.branch))
 
     def run(self):
-
         if not os.path.exists(os.path.abspath(self.working_dir)):
             raise Exception('Working folder {} does not exist'.format(self.working_dir))
 
         self.run_command_readable(self.branch_data, run_location=self.working_dir)
+        if self.comp_facility == "TOpAS":
+            self.run_command_readable(
+                "tar -czf ${{_CONDOR_JOB_IWD}}/mlruns_{}To{}.tar.gz mlruns".format(
+                    self.branch, 
+                    int(self.branch) + 1
+                ), 
+                run_location=self.working_dir
+            )        
+        taskout = self.output()
+        taskout.dump('Task ended with no error.')

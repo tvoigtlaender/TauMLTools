@@ -27,5 +27,4 @@ action() {
     source "{{analysis_path}}/env.sh" "{{environment}}"
   fi
 }
-sleep 72000
 action

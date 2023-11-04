@@ -6,7 +6,13 @@ import math
 
 import luigi
 import law
+from datetime import datetime
 law.contrib.load("htcondor")
+
+if os.getenv("LOCAL_TIMESTAMP"):
+    startup_time = os.getenv("LOCAL_TIMESTAMP")
+else:
+    startup_time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f")
 
 def copy_param(ref_param, new_default):
   param = copy.deepcopy(ref_param)
@@ -19,7 +25,10 @@ class Task(law.Task):
   some convenience methods to create local file and directory targets at the default data path.
   """
 
-  version = luigi.Parameter()
+  version = luigi.Parameter(
+    default="default/{}".format(startup_time),
+    description="Versions of runs. Set to a timestamp as default."
+  )
 
   def store_parts(self):
     return (self.__class__.__name__, self.version)
@@ -68,6 +77,7 @@ class HTCondorWorkflow(law.htcondor.HTCondorWorkflow):
     # render_variables are rendered into all files sent with a job
     config.render_variables["analysis_path"] = os.getenv("ANALYSIS_PATH")
     config.render_variables["environment"] = self.environment
+    config.render_variables["LOCAL_TIMESTAMP"] = startup_time
     if 'CONDA_EXE' in os.environ:
       config.render_variables["conda_path"]    = '/'.join(os.environ['CONDA_EXE'].split('/')[:-2])
 
