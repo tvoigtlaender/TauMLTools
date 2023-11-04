@@ -36,7 +36,6 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
     # Redirect location of job files to <local_path>/"files"/...
     def htcondor_create_job_file_factory(self):
         jobdir = self.local_path("files")
-        print("HELP", jobdir)
         os.makedirs(jobdir, exist_ok=True)
         factory = super(HTCondorWorkflow, self).htcondor_create_job_file_factory(
             dir=jobdir,
@@ -187,6 +186,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
 
         if self.comp_facility != "TOpAS":
             config.custom_content.append(("getenv", "true"))
+        config.render_variables["environment"] = self.environment
         config.render_variables["LOCAL_TIMESTAMP"] = startup_time
         config.custom_content.append(('JobBatchName'  , self.batch_name))
         config.custom_content.append(("error" , '/'.join([err_dir, 'err_{}.txt'.format(job_num)])))
@@ -208,7 +208,11 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         return {i: cmd for i, cmd in enumerate(self.cmds_list)}
 
     def output(self):
-        return self.local_target("empty_file_{}.txt".format(self.branch))
+        if (self.comp_facility == "TOpAS" and not os.getenv("LAW_JOB_INIT_DIR")):
+            # If run on TOpAS, check if the result .tar is present 
+            return self.local_target("files/mlruns_{}To{}.tar.gz".format(self.branch, int(self.branch) + 1))
+        else:
+            return self.local_target("empty_file_{}.txt".format(self.branch))
 
     def run(self):
         if not os.path.exists(os.path.abspath(self.working_dir)):
@@ -217,7 +221,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         self.run_command_readable(self.branch_data, run_location=self.working_dir)
         if self.comp_facility == "TOpAS":
             self.run_command_readable(
-                "tar -czf ${{_CONDOR_JOB_IWD}}/mlruns_{}To{}.tar.gz mlruns".format(
+                "tar -czf ${{LAW_JOB_INIT_DIR}}/mlruns_{}To{}.tar.gz mlruns".format(
                     self.branch, 
                     int(self.branch) + 1
                 ), 

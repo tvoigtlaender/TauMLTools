@@ -8,17 +8,17 @@ defaults:
 
 # mlflow
 path_to_mlflow: ./mlruns
-experiment_name: TOpAS_test_2
+experiment_name: ???
 
 # datasets
-dataset_name: TOpAS_test_2 # to log to mlflow for bookkeeping
+dataset_name: ??? # to log to mlflow for bookkeeping
 datasets: 
   train:
-    TOpAS_test_2: "../../../../tf_skims_v7_short" # will take all files from "train" subfolder of this dataset
+    ???: ??? # will take all files from "train" subfolder of this dataset, relative to location of train.py script
   val:
-    TOpAS_test_2: "../../../../tf_skims_v7_short" # will take all files from "val" subfolder of this dataset
+    ???: ??? # will take all files from "val" subfolder of this dataset, relative to location of train.py script
 
-input_dataset_cfg: "../../../../tf_skims_v7_short/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here
+input_dataset_cfg: "???/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here, relative to location of train.py script
 
 # TF dataset formation
 tf_dataset_cfg:

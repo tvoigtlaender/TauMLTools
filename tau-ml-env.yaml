@@ -425,5 +425,3 @@ dependencies:
     - tf-estimator-nightly==2.8.0.dev2021122109
     - uproot==5.0.3
     - wrapt==1.14.1
-prefix: /work/tvoigtlaender/new_loader/update/TauMLTools/soft/conda/envs/tau-ml
-
