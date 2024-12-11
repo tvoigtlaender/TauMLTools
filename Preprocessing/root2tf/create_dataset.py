@@ -9,22 +9,21 @@ import hydra
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from utils.data_preprocessing import load_from_file, preprocess_array, awkward_to_tf, compute_labels, _get_xrootd_filenames
+from utils.remote_glob import remote_glob
 
-import tensorflow as tf
+#import tensorflow as tf
 import awkward as ak
 import numpy as np
 
-def fetch_file_list(_files, cfg):
+def fetch_file_list(_files):
     files = []
-    for _entry in _files:
-        if _entry.startswith('root://'): # stream with xrootd, assume _entry is a directory to read *all* ROOT files from
-            files += _get_xrootd_filenames(_entry, verbose=cfg['verbose'])
-        else: # complete the pattern with glob and append file names to the final list
-            files += glob(to_absolute_path(_entry))
-    return set(files)
+    for _entry, tau_types in _files.items():
+            files += [(path , tau_types) for path in remote_glob(_entry)]
+    return sorted(files)
 
 def process_files(files, cfg, dataset_type, dataset_cfg):
+    import tensorflow as tf
+    from utils.data_preprocessing import load_from_file, preprocess_array, awkward_to_tf, compute_labels
     print(f'\n-> Processing input files ({dataset_type})')
 
     tau_type_map  = cfg['gen_cfg']['tau_type_map']
@@ -95,7 +94,7 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
             print(f'\n        Preparing TF datasets: took {(time_3-time_2):.1f} s.')
 
         # remove existing datasets
-        path_to_dataset = to_absolute_path(f'{cfg["path_to_dataset"]}/{cfg["dataset_name"]}/{dataset_type}/{os.path.splitext(os.path.basename(file_name))[0]}')
+        path_to_dataset = to_absolute_path(f'{cfg["path_to_dataset"]}/{dataset_type}/{os.path.splitext(os.path.basename(file_name))[0]}')
         if os.path.exists(path_to_dataset):
             shutil.rmtree(path_to_dataset)
         else:
@@ -131,7 +130,7 @@ def main(cfg: DictConfig) -> None:
                 print(f'    {k}: {v} samples')
     
     # save the config (to be fetched during the training)
-    OmegaConf.save(config=cfg, f=to_absolute_path(f'{cfg["path_to_dataset"]}/{cfg["dataset_name"]}/cfg.yaml')) 
+    OmegaConf.save(config=cfg, f=to_absolute_path(f'{cfg["path_to_dataset"]}/cfg.yaml')) 
 
     if cfg['verbose']:
         print(f'\nTotal time: {(time_4-time_start):.1f} s.\n')

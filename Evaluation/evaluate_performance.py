@@ -20,7 +20,7 @@ def main(cfg: DictConfig) -> None:
     # path_to_weights_taus = to_absolute_path(cfg.path_to_weights_taus) if cfg.path_to_weights_taus is not None else None
     # path_to_weights_vs_type = to_absolute_path(cfg.path_to_weights_vs_type) if cfg.path_to_weights_vs_type is not None else None
     path_to_artifacts = to_absolute_path(f'{cfg.path_to_mlflow}/{cfg.experiment_id}/{cfg.run_id}/artifacts/')
-    output_json_path = f'{path_to_artifacts}/performance.json'
+    output_json_path = f'{path_to_artifacts}/{cfg.output_file}'
 
     # init Discriminator() class from filtered input configuration
     field_names = set(f_.name for f_ in fields(eval_tools.Discriminator))
@@ -52,16 +52,19 @@ def main(cfg: DictConfig) -> None:
     df_list = []
     print()
     for sample_alias, tau_types in cfg.input_samples.items():
-        input_files, pred_files, target_files = eval_tools.prepare_filelists(sample_alias, cfg.path_to_input, cfg.path_to_pred, cfg.path_to_target, path_to_artifacts)
+        for tau_type in tau_types:
+            if tau_type not in ["tau", cfg.vs_type]: continue
+            input_files, pred_files, target_files = eval_tools.prepare_filelists(sample_alias, cfg.path_to_input, cfg.path_to_pred, cfg.path_to_target, path_to_artifacts, tau_type)
 
-        # loop over all input files per sample with associated predictions/targets (if present) and combine together into df
-        print(f'[INFO] Creating dataframe for sample: {sample_alias}')
-        for input_file, pred_file, target_file in zip(input_files, pred_files, target_files):
-            df = eval_tools.create_df(input_file, input_branches, pred_file, target_file, None, # weights functionality is WIP
-                                            cfg.discriminator.pred_column_prefix, cfg.discriminator.target_column_prefix)
-            gen_selection = ' or '.join([f'(gen_{tau_type}==1)' for tau_type in tau_types]) # gen_* are constructed in `add_targets()`
-            df = df.query(gen_selection)
-            df_list.append(df)
+            # loop over all input files per sample with associated predictions/targets (if present) and combine together into df
+            print(f'[INFO] Creating dataframe for sample {sample_alias} with tau type {tau_type}')
+            for input_file, pred_file, target_file in zip(input_files, pred_files, target_files):
+                df = eval_tools.create_df(input_file, input_branches, pred_file, target_file, None, # weights functionality is WIP
+                                                cfg.discriminator.pred_column_prefix, cfg.discriminator.target_column_prefix)
+                gen_selection = f'(gen_{tau_type}==1)' # gen_* are constructed in `add_targets()`
+                # gen_selection = ' or '.join([f'(gen_{tau_type}==1)' for tau_type in tau_types]) # gen_* are constructed in `add_targets()`
+                df = df.query(gen_selection)
+                df_list.append(df)
     df_all = pd.concat(df_list)
 
     # apply selection

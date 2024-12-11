@@ -12,27 +12,27 @@ from XRootD.client.flags import DirListFlags, StatInfoFlags
 from utils.gen_preprocessing import compute_genmatch_dR, recompute_tau_type, dict_to_numba
 from numba.core import types
 
-def _get_xrootd_filenames(prompt, verbose=False):
-    client_path = re.findall("^(root://.*/)/.*$", prompt)[0]
-    xrootd_client = client.FileSystem(client_path)
-    if verbose:
-        print(f"\nStream input files with client {client_path}\n")
-    data_path = re.findall("^root://.*/(/.*$)", prompt)[0]
-    if verbose:
-        print(f"\nStream input from path {data_path}\n")
-    if data_path.endswith(".root"):
-        status, stats = xrootd_client.stat(data_path)
-        if status.status != 0:
-            print(f"\nStatus of {data_path} failed.\n")
-            return None
-        else:
-            if not stats.flags & StatInfoFlags.IS_DIR:
-                return [prompt]
-    status, listing = xrootd_client.dirlist(data_path, DirListFlags.STAT)
-    if status.status != 0:
-        print(f"\nDirList of {data_path} failed.\n")
-    data_files_base = [entry.name for entry in listing if re.search(".*\.root$", entry.name)]
-    return [os.path.dirname(prompt) + '/' + root_file for root_file in data_files_base]
+# def _get_xrootd_filenames(prompt, verbose=False):
+#     client_path = re.findall("^(root://.*/)/.*$", prompt)[0]
+#     xrootd_client = client.FileSystem(client_path)
+#     if verbose:
+#         print(f"\nStream input files with client {client_path}\n")
+#     data_path = re.findall("^root://.*/(/.*$)", prompt)[0]
+#     if verbose:
+#         print(f"\nStream input from path {data_path}\n")
+#     if data_path.endswith(".root"):
+#         status, stats = xrootd_client.stat(data_path)
+#         if status.status != 0:
+#             print(f"\nStatus of {data_path} failed.\n")
+#             return None
+#         else:
+#             if not stats.flags & StatInfoFlags.IS_DIR:
+#                 return [prompt]
+#     status, listing = xrootd_client.dirlist(data_path, DirListFlags.STAT)
+#     if status.status != 0:
+#         print(f"\nDirList of {data_path} failed.\n")
+#     data_files_base = [entry.name for entry in listing if re.search(".*\.root$", entry.name)]
+#     return [os.path.dirname(prompt) + '/' + root_file for root_file in data_files_base]
 
 def load_from_file(file_name, tree_name, step_size):
     print(f'      - {file_name}')
@@ -62,6 +62,10 @@ def awkward_to_tf(a, feature_names, is_ragged):
     return tf_array
 
 def preprocess_array(a, feature_names, add_feature_names, verbose=False):
+    
+    # remove taus with abnormal phi
+    a = a[np.abs(a['tau_phi'])<2.*np.pi] 
+    
     # dictionary to store preprocessed features (per feature type)
     a_preprocessed = {feature_type: {} for feature_type in feature_names.keys()}
     

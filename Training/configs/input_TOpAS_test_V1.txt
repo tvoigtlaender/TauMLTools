@@ -1,0 +1,1 @@
+python train.py model=transformer experiment_name=ShuffleMergeSpectral_trainingSamples-2_rerun_2TFfiles dataset_name=ShuffleMergeSpectral_trainingSamples-2_rerun_2TFfiles

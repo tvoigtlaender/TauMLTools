@@ -10,7 +10,7 @@ plot_setup_map:
     ylabel: 'Electron mis-id probability'
     ylabel_size: 16
     yscale: 'log'
-    ylim: [2e-5, 1]
+    ylim: [2e-6, 1]
     #
     ratio_xlabel_size: 16
     ratio_yscale: 'log'
@@ -52,7 +52,7 @@ plot_setup_map:
     ylabel: 'Jet mis-id probability'
     ylabel_size: 16
     yscale: 'log'
-    ylim: [3e-4, 1]
+    ylim: [1e-4, 1]
     #
     ratio_xlabel_size: 16
     ratio_yscale: 'linear'

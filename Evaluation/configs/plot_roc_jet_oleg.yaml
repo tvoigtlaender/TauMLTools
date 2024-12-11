@@ -1,0 +1,67 @@
+defaults:
+  - plot_setup
+  - _self_
+
+# input
+path_to_mlflow: /work/tvoigtlaender/mlruns/
+experiment_id: 1
+discriminators: # in the format run_id -> cfg
+  6c30af7daec845a188d631979316a20f: # DeepTau v2.5
+    name: "TT_LargeShort_noCut"
+    curve_types: ['roc_curve'] 
+    plot_cfg:
+      color: green
+      dashed: false
+      alpha: 1.
+      dots_only: false
+      with_errors: true
+  634aeb7306184e7eb82973e236ea967a: # DeepTau v2.1
+    name: "TT_Small_noCut"
+    curve_types: ['roc_curve'] #, 'roc_wp'] 
+    plot_cfg:
+      color: purple
+      dashed: true
+      alpha: 1.
+      dots_only: false # if true, possible also to specify `marker_size` here
+      with_errors: true # plot error bars for each of `curve_types`
+  2575b1544b7a4af7ab43983af29e8ed0: # DeepTau v2.1
+    name: "TT_Oleg_noCut"
+    curve_types: ['roc_curve'] #, 'roc_wp'] 
+    plot_cfg:
+      color: gray
+      dashed: false
+      alpha: 1.
+      dots_only: false # if true, possible also to specify `marker_size` here
+      with_errors: true # plot error bars for each of `curve_types`
+  7ba6314641ad4a93b82775c9d223b8ef : # DeepTau v2.5
+    name: "DeepTau (v2.1)"
+    curve_types: ['roc_curve', 'roc_wp'] 
+    plot_cfg:
+      color: black
+      dashed: true
+      alpha: 1.
+      dots_only: false
+      with_errors: true
+  d39627c591f943a2a674d0a091e05125 : # DeepTau v2.5
+    name: "DeepTau (v2.5)"
+    curve_types: ['roc_curve', 'roc_wp'] 
+    plot_cfg:
+      color: black
+      dashed: false
+      alpha: 1.
+      dots_only: false
+      with_errors: true
+reference:  # should be present in `discriminators`
+  2575b1544b7a4af7ab43983af29e8ed0: 'roc_curve'
+
+# region
+period:   \ 2018 (13 TeV) \  Phase 2 \ # for plotting only, not used in curve selection 
+vs_type: jet # jet/e/mu/tau
+dataset_alias: tau_ggH_jet_TT # sample alias asigned in yaml cfg at eval step
+pt_bin: [20, 100] # list, e.g [20, 100], min and max
+eta_bin: [0, 2.3] # list, e.g [0, 1.5], min and max (of absolute eta)
+dm_bin: [0, 1, 2, 10, 11] # list, e.g [0, 1, 2, 10, 11], all DMs to be included
+input_path: performance.json
+# will log the plot to the run of the first discriminator in the "discriminators" list
+output_dir: plots # within mlflow artifacts
+output_name: 'roc_curve_vs_${vs_type}_${dataset_alias}_pt_${pt_bin[0]}_${pt_bin[1]}_eta_${eta_bin[0]}_${eta_bin[1]}_dm_'

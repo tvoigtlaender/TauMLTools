@@ -18,10 +18,14 @@ law.contrib.load("wlcg")
 class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
 
     working_dir  = luigi.Parameter(description = 'Path to the working directory.')
-    data_dir  = luigi.Parameter(description = 'Path to the data directory.')
+    data_dir_train  = luigi.Parameter(description = 'Path to the data directory of training data.')
+    data_dir_val  = luigi.Parameter(description = 'Path to the data directory of validation data.')
+    max_files_train  = luigi.Parameter(default = "10000000", description = 'Maximum number of files allowed for training')
+    max_files_val  = luigi.Parameter(default = "10000000", description = 'Maximum number of files allowed for validation')
+    evictable  = luigi.Parameter(default = "False", description = 'Can job be evicted without breaking?')
     num_CPUs   = luigi.Parameter(default = "None", significant = False, description = 'Number of requested CPU.')
     num_GPUs   = luigi.Parameter(default = "None", significant = False, description = 'Number of requested GPU.')
-    accounting_group   = luigi.Parameter(default = "1", significant = False, description = 'Accounting used for TOpAS.')
+    accounting_group   = luigi.Parameter(default = "1", significant = False, description = 'Accounting used for ETP.')
     cuda_memory  = luigi.Parameter(default = "None", significant = False, description = 'Amount of necessary device memory.')
     input_cmds   = luigi.Parameter(description = 'Path to the txt file with input commands.')
     requirements = luigi.Parameter(default=f"(OpSysAndVer =?= \"CentOS7\")", significant = False, description = 'HTCondor requirements')
@@ -77,6 +81,56 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         my_env = self.convert_env_to_dict(out)
         return my_env
 
+    # Run a bash command
+    #   Command can be composed of multiple parts (interpreted as seperated by a space).
+    #   A sourcescript can be provided that is called by set_environment the resulting
+    #       env is then used for the command
+    #   The command is run as if it was called from run_location
+    #   With "collect_out" the output of the run command is returned
+    def run_command(
+        self,
+        command=[],
+        sourcescript=[],
+        run_location=None,
+        collect_out=False,
+        silent=False,
+    ):
+        if command:
+            if isinstance(command, str):
+                command = [command]
+            logstring = "Running {}".format(command)
+            if run_location:
+                logstring += " from {}".format(run_location)
+            if not silent:
+                print(logstring)
+            if sourcescript:
+                run_env = self.set_environment(sourcescript, silent)
+            else:
+                run_env = None
+            code, out, error = interruptable_popen(
+                " ".join(command),
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=run_env,
+                cwd=run_location,
+            )
+            if not silent:
+                print("Output: {}".format(out))
+            if not silent or code != 0:
+                print("Error: {}".format(error))
+            if code != 0:
+                print("Error when running {}.".format(list(command)))
+                print("Command returned non-zero exit status {}.".format(code))
+                raise Exception("{} failed".format(list(command)))
+            else:
+                if not silent:
+                    print("Command successful.")
+            if collect_out:
+                return out
+        else:
+            raise Exception("No command provided.")
+        
     def run_command_readable(self, command=[], sourcescript=[], run_location=None):
         """
         This can be used, to run a command, where you want to read the output while the command is running.
@@ -145,7 +199,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
 
         full_req = self.requirements
         if (self.num_GPUs != "None"):
-            if self.comp_facility == "TOpAS":
+            if self.comp_facility == "ETP":
                 config.custom_content.append(('request_gpus', self.num_GPUs))
             else:
                 config.custom_content.append(('Request_GPUs', self.num_GPUs))
@@ -158,33 +212,54 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         elif self.comp_facility=="lxplus":
             config.custom_content.append(("+MaxRuntime", int(math.floor(self.max_runtime * 3600)) - 1))
             config.custom_content.append(('request_memory', '{}'.format(self.max_memory)))
-        elif self.comp_facility == "TOpAS":
-            # Use proxy file located in $X509_USER_PROXY or /tmp/x509up_u$(id) if empty
+        elif self.comp_facility == "ETP":
+            # Use proxy file located in $X509_USER_PROXY or /tmp/x509up_u$(id) if empty data_dir_val
             htcondor_user_proxy = law.wlcg.get_vomsproxy_file()
-            config.render_variables["data_dir"] = self.data_dir
+            config.render_variables["data_dir_train"] = self.data_dir_train
+            config.render_variables["data_dir_val"] = self.data_dir_val
             config.render_variables["comp_facility"] = self.comp_facility
-            config.render_variables["data_dir"] = self.data_dir
+            config.render_variables["max_files_train"] = self.max_files_train
+            config.render_variables["max_files_val"] = self.max_files_val
             config.custom_content.append(("x509userproxy", htcondor_user_proxy))
             config.custom_content.append(('+RemoteJob', 'True'))
             config.custom_content.append(("+RequestWalltime", int(math.floor(self.max_runtime * 3600)) - 1))
             for i in ["num_CPUs", "max_memory", "max_disk", "accounting_group", "docker_image"]:
                 if getattr(self, i) == "None":
-                    raise Exception('TOpAS requires a value for {}.'.format(i))
+                    raise Exception('ETP requires a value for {}.'.format(i))
             config.custom_content.append(('request_cpus', self.num_CPUs))
-            config.custom_content.append(('RequestMemory', '{}'.format(self.max_memory)))
+            config.custom_content.append(('RequestMemory', self.max_memory))
+            # config.custom_content.append(('Request_GPUMemoryMB', '0'))
+            if self.evictable:
+                config.custom_content.append(('+evictable', self.evictable))
             config.custom_content.append(('RequestDisk', f'{self.max_disk}'))
             config.custom_content.append(('accounting_group', self.accounting_group))
             config.custom_content.append(("universe", "docker"))
             config.custom_content.append(("docker_image", self.docker_image))
-            os.system("mkdir -p tarballs")
-            os.system("rm tarballs/TauMLTools.tar.gz")
-            os.system('tar --exclude={"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__"} -czf tarballs/TauMLTools.tar.gz  ../TauMLTools')
-            config.input_files["Tau_tar"] = law.JobInputFile("tarballs/TauMLTools.tar.gz", render=False)
+            # config.custom_content.append(("docker_network_type", "host")) # Fix for xrootd issues on ETP, nor clear what the issue is, but it works with the host network
+            
+            tarball_dir = os.path.abspath(f"tarballs/{self.version}")
+            tarball_local = law.LocalFileTarget(
+                os.path.join(
+                    tarball_dir,
+                    self.__class__.__name__,
+                    "TauMLTools.tar.gz",
+                )
+            )
+            if not tarball_local.exists():
+                tarball_local.parent.touch()
+                os.system(f'tar --exclude={{"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__"}} -czf {tarball_local.path}  ../TauMLTools')
+            config.input_files["Tau_tar"] = law.JobInputFile(tarball_local.path, render=False, copy=False)
+            
+            # os.system("mkdir -p tarballs")
+            # os.system("rm tarballs/TauMLTools.tar.gz")
+            # os.system('tar --exclude={"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__"} -czf tarballs/TauMLTools.tar.gz  ../TauMLTools')
+            # config.input_files["Tau_tar"] = law.JobInputFile("tarballs/TauMLTools.tar.gz", render=False)
+            config.input_files["copy_script"] = law.JobInputFile("copy_in.sh", render=False, copy=False)
             config.output_files.append("mlruns.tar.gz")
         else:
             raise Exception('no specific setups for {self.comp_facility} computing facility')
 
-        if self.comp_facility != "TOpAS":
+        if self.comp_facility != "ETP":
             config.custom_content.append(("getenv", "true"))
         config.render_variables["environment"] = self.environment
         config.render_variables["LOCAL_TIMESTAMP"] = startup_time
@@ -208,8 +283,10 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         return {i: cmd for i, cmd in enumerate(self.cmds_list)}
 
     def output(self):
-        if (self.comp_facility == "TOpAS" and not os.getenv("LAW_JOB_INIT_DIR")):
-            # If run on TOpAS, check if the result .tar is present 
+        # print("HERE","files/mlruns_{}To{}.tar.gz".format(self.branch, int(self.branch) + 1))
+        # print("HERE",self.local_target("files/mlruns_{}To{}.tar.gz".format(self.branch, int(self.branch) + 1)))
+        if (self.comp_facility == "ETP" and not os.getenv("LAW_JOB_INIT_DIR")):
+            # If run on ETP, check if the result .tar is present 
             return self.local_target("files/mlruns_{}To{}.tar.gz".format(self.branch, int(self.branch) + 1))
         else:
             return self.local_target("empty_file_{}.txt".format(self.branch))
@@ -219,8 +296,9 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
             raise Exception('Working folder {} does not exist'.format(self.working_dir))
 
         self.run_command_readable(self.branch_data, run_location=self.working_dir)
-        if self.comp_facility == "TOpAS":
-            self.run_command_readable(
+        # self.run_command(self.branch_data, run_location=self.working_dir)
+        if self.comp_facility == "ETP":
+            self.run_command(
                 "tar -czf ${{LAW_JOB_INIT_DIR}}/mlruns_{}To{}.tar.gz mlruns".format(
                     self.branch, 
                     int(self.branch) + 1

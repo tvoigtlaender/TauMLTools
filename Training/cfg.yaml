@@ -1,0 +1,256 @@
+feature_names:
+  pfCand:
+  - r
+  - theta
+  - rel_pt
+  - particle_type
+  - charge
+  - pvAssociationQuality
+  - fromPV
+  - tauLeadChargedHadrCand
+  - puppiWeight
+  - lostInnerHits
+  - nPixelHits
+  - hasTrackDetails
+  - nHits
+  - nPixelLayers
+  - nStripLayers
+  - vertex_dx
+  - vertex_dy
+  - vertex_dz
+  - vertex_dx_tauFL
+  - vertex_dy_tauFL
+  - vertex_dz_tauFL
+  - dxy
+  - dxy_sig
+  - dz
+  - dz_sig
+  - track_ndof
+  - chi2_ndof
+  - hcalFraction
+  - rawCaloFraction
+  - rawHcalFraction
+  ele:
+  - r
+  - theta
+  - rel_pt
+  - particle_type
+  - cc_valid
+  - cc_ele_rel_energy
+  - cc_gamma_rel_energy
+  - cc_n_gamma
+  - rel_trackMomentumAtVtx
+  - rel_trackMomentumAtCalo
+  - rel_trackMomentumOut
+  - rel_trackMomentumAtEleClus
+  - rel_trackMomentumAtVtxWithConstraint
+  - rel_ecalEnergy
+  - ecalEnergy_sig
+  - eSuperClusterOverP
+  - eSeedClusterOverP
+  - eSeedClusterOverPout
+  - eEleClusterOverPout
+  - deltaEtaSuperClusterTrackAtVtx
+  - deltaEtaSeedClusterTrackAtCalo
+  - deltaEtaEleClusterTrackAtCalo
+  - deltaPhiEleClusterTrackAtCalo
+  - deltaPhiSuperClusterTrackAtVtx
+  - deltaPhiSeedClusterTrackAtCalo
+  - mvaInput_earlyBrem
+  - mvaInput_lateBrem
+  - mvaInput_sigmaEtaEta
+  - mvaInput_hadEnergy
+  - mvaInput_deltaEta
+  - gsfTrack_normalizedChi2
+  - gsfTrack_numberOfValidHits
+  - rel_gsfTrack_pt
+  - gsfTrack_pt_sig
+  - has_closestCtfTrack
+  - closestCtfTrack_normalizedChi2
+  - closestCtfTrack_numberOfValidHits
+  - sigmaEtaEta
+  - sigmaIetaIeta
+  - sigmaIphiIphi
+  - sigmaIetaIphi
+  - e1x5
+  - e2x5Max
+  - e5x5
+  - r9
+  - hcalDepth1OverEcal
+  - hcalDepth2OverEcal
+  - hcalDepth1OverEcalBc
+  - hcalDepth2OverEcalBc
+  - eLeft
+  - eRight
+  - eBottom
+  - eTop
+  - full5x5_sigmaEtaEta
+  - full5x5_sigmaIetaIeta
+  - full5x5_sigmaIphiIphi
+  - full5x5_sigmaIetaIphi
+  - full5x5_e1x5
+  - full5x5_e2x5Max
+  - full5x5_e5x5
+  - full5x5_r9
+  - full5x5_hcalDepth1OverEcal
+  - full5x5_hcalDepth2OverEcal
+  - full5x5_hcalDepth1OverEcalBc
+  - full5x5_hcalDepth2OverEcalBc
+  - full5x5_eLeft
+  - full5x5_eRight
+  - full5x5_eBottom
+  - full5x5_eTop
+  - full5x5_e2x5Left
+  - full5x5_e2x5Right
+  - full5x5_e2x5Bottom
+  - full5x5_e2x5Top
+  muon:
+  - r
+  - theta
+  - rel_pt
+  - particle_type
+  - dxy
+  - dxy_sig
+  - normalizedChi2_valid
+  - normalizedChi2
+  - numberOfValidHits
+  - segmentCompatibility
+  - caloCompatibility
+  - pfEcalEnergy_valid
+  - rel_pfEcalEnergy
+  - n_matches_DT_1
+  - n_matches_DT_2
+  - n_matches_DT_3
+  - n_matches_DT_4
+  - n_matches_CSC_1
+  - n_matches_CSC_2
+  - n_matches_CSC_3
+  - n_matches_CSC_4
+  - n_matches_RPC_1
+  - n_matches_RPC_2
+  - n_matches_RPC_3
+  - n_matches_RPC_4
+  - n_hits_DT_1
+  - n_hits_DT_2
+  - n_hits_DT_3
+  - n_hits_DT_4
+  - n_hits_CSC_1
+  - n_hits_CSC_2
+  - n_hits_CSC_3
+  - n_hits_CSC_4
+  - n_hits_RPC_1
+  - n_hits_RPC_2
+  - n_hits_RPC_3
+  - n_hits_RPC_4
+  global:
+  - particle_type
+  - rho
+  - tau_pt
+  - tau_eta
+  - tau_mass
+  - tau_E_over_pt
+  - tau_charge
+  - tau_n_charged_prongs
+  - tau_n_neutral_prongs
+  - tau_chargedIsoPtSum
+  - tau_chargedIsoPtSumdR03_over_dR05
+  - tau_footprintCorrection
+  - tau_neutralIsoPtSum
+  - tau_neutralIsoPtSumWeight_over_neutralIsoPtSum
+  - tau_neutralIsoPtSumWeightdR03_over_neutralIsoPtSum
+  - tau_neutralIsoPtSumdR03_over_dR05
+  - tau_photonPtSumOutsideSignalCone
+  - tau_puCorrPtSum
+  - tau_hasSecondaryVertex
+  - tau_sv_minus_pv_x
+  - tau_sv_minus_pv_y
+  - tau_sv_minus_pv_z
+  - tau_dxy_valid
+  - tau_dxy
+  - tau_dxy_sig
+  - tau_ip3d_valid
+  - tau_ip3d
+  - tau_ip3d_sig
+  - tau_dz_sig_valid
+  - tau_dz
+  - tau_dz_sig
+  - tau_flightLength_x
+  - tau_flightLength_y
+  - tau_flightLength_z
+  - tau_flightLength_sig
+  - tau_pt_weighted_deta_strip
+  - tau_pt_weighted_dphi_strip
+  - tau_pt_weighted_dr_signal
+  - tau_pt_weighted_dr_iso
+  - tau_e_ratio_valid
+  - tau_e_ratio
+  - tau_gj_angle_diff_valid
+  - tau_gj_angle_diff
+  - tau_n_photons
+  - tau_emFraction
+  - tau_inside_ecal_crack
+  - tau_leadingTrackNormChi2
+  - tau_leadChargedCand_etaAtEcalEntrance_minus_tau_eta
+gen_cfg:
+  genmatch_dR: 0.2
+  genLepton_match_map:
+    Electron: 1
+    Muon: 2
+    TauElectron: 3
+    TauMuon: 4
+    Tau: 5
+    NoMatch: 6
+    None: 0
+    Exception: -1
+  genLepton_kind_map:
+    PromptElectron: 1
+    PromptMuon: 2
+    TauDecayedToElectron: 3
+    TauDecayedToMuon: 4
+    TauDecayedToHadrons: 5
+    Other: 6
+  sample_type_map:
+    Data: 0
+    MC: 1
+    Embedded: 2
+  tau_type_map:
+    e: 0
+    mu: 1
+    tau: 2
+    jet: 3
+    emb_e: 4
+    emb_mu: 5
+    emb_tau: 6
+    emb_jet: 7
+    data: 8
+    no_type: -1
+verbose: true
+tree_name: taus
+step_size: 10 GB
+input_data:
+  train:
+    recompute_tau_type: false
+    add_columns: null
+    files:
+    - root://eosuser.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_300.root
+    - root://eosuser.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_301.root
+    - root://eosuser.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_302.root
+    - root://eosuser.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_303.root
+  val:
+    recompute_tau_type: false
+    add_columns: null
+    files:
+    - root://eosuser.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_450.root
+dataset_name: TOpAS_test_2
+path_to_dataset: /ceph/srv/tvoigtlaender/tatoo/tf_skims_v7/
+label_columns:
+- label_e
+- label_mu
+- label_tau
+- label_jet
+- label_emb_e
+- label_emb_mu
+- label_emb_tau
+- label_emb_jet
+- label_data
+- label_no_type

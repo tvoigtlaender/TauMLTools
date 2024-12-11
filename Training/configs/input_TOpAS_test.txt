@@ -1,1 +1,0 @@
-python train.py model=transformer experiment_name=TOpAS_test_2 dataset_name=TOpAS_test_2

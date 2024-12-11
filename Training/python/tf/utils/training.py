@@ -2,11 +2,15 @@ from glob import glob
 from collections import defaultdict
 from omegaconf import OmegaConf
 from hydra.core.hydra_config import HydraConfig
-
+from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 from tensorflow.python.ops import math_ops, array_ops
 import numpy as np
 import mlflow
+import pickle
+import time
+import os
+import json
 
 def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
     if n_gpu < 1:
@@ -25,7 +29,7 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
         datasets_for_training = _combine_datasets(datasets, load=False)
         element_spec = tf.data.Dataset.load(
             datasets_for_training['train'][0], 
-            compression='GZIP',
+            # compression='GZIP',
             reader_func=lambda dataset: dataset.interleave(
                 lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
             ).element_spec
@@ -44,7 +48,8 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
             cycle_length=cycle_length, 
             num_parallel_calls=tf.data.AUTOTUNE, 
             deterministic=False, 
-            block_length=block_length)
+            block_length=block_length,
+        )
 
         val_data = tf.data.Dataset.from_tensor_slices(datasets_for_training['val'])
         val_data = val_data.interleave(
@@ -58,10 +63,12 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
             cycle_length=cycle_length, 
             num_parallel_calls=tf.data.AUTOTUNE, 
             deterministic=False, 
-            block_length=block_length)
+            block_length=block_length,
+        )
     else:
         raise ValueError("`combine_via` should be either 'sampling' or 'interleave'")
-
+        
+        
     # shuffle/cache
     if tf_dataset_cfg["shuffle_buffer_size"] is not None:
         train_data = train_data.shuffle(tf_dataset_cfg["shuffle_buffer_size"])
@@ -73,7 +80,77 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
         train_data = train_data.batch(tf_dataset_cfg["train_batch_size"] * global_batch_multiplier)
         val_data = val_data.batch(tf_dataset_cfg["val_batch_size"] * global_batch_multiplier)
     else:
+        # train_data, val_data = _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
         train_data, val_data = _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
+
+    # Add axis to global collection to 
+    if "global" in list(input_dataset_cfg['feature_names'].keys()):
+        glob_index = list(input_dataset_cfg['feature_names'].keys()).index("global")
+        train_data = train_data.map(lambda *inputs: (*inputs[:glob_index], tf.RaggedTensor.from_tensor(tf.expand_dims(inputs[glob_index],axis=-2)), *inputs[glob_index+1:]))
+        val_data = val_data.map(lambda *inputs: (*inputs[:glob_index], tf.RaggedTensor.from_tensor(tf.expand_dims(inputs[glob_index],axis=-2)), *inputs[glob_index+1:]))
+        
+    # Define function to get scaling from dataset
+    def get_train_dat_scaler_batch(input_data, num_collections):
+        # Innitialize scaler for each collection
+        scalers = [StandardScaler() for i in range(num_collections)]
+        # Go through all batches
+        for batch in input_data:
+            # Go through all particle collections
+            for i, collection in enumerate(batch[:num_collections]):
+                if collection.values.shape[0] > 0:
+                    scalers[i].partial_fit(collection.values)
+        scaling_data = []
+        # Return data of scalers
+        for scaler in scalers:
+            scaling_data.append({"mean":scaler.mean_, "var": scaler.var_,})
+        return scaling_data
+    
+    if tf_dataset_cfg["scaler"] is not None:
+        if os.path.isfile(tf_dataset_cfg["scaler"]):
+            with open(tf_dataset_cfg["scaler"]) as f:
+                scaling_data = json.load(f)
+            print(f"Scaler loaded from {tf_dataset_cfg['scaler']}.")
+        else:
+            print(f"Scaler file not found in {tf_dataset_cfg['scaler']}, calculating new scaler.")
+            start_time_ = time.time()
+            scaling_data = get_train_dat_scaler_batch(train_data, len(input_dataset_cfg['feature_names']))
+            end_time_ = time.time()
+            print("Time to create scaler: {}".format(end_time_-start_time_))
+            # Custom function to serialize NumPy arrays
+            def serialize_numpy(obj):
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()  # Convert NumPy array to list
+                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+            try:
+                os.mkdir(os.path.dirname(tf_dataset_cfg["scaler"]))
+            except:
+                pass
+            with open(tf_dataset_cfg["scaler"], "w") as file:
+                json.dump(scaling_data, file, default=serialize_numpy)
+            print(f"Scaler saved to {tf_dataset_cfg['scaler']}")
+        mlflow.log_artifacts(os.path.dirname(tf_dataset_cfg["scaler"]), "scalers")
+                
+        scalers = [
+            tf.keras.layers.Normalization(
+                axis=-1, 
+                mean=scaling_data[i]["mean"], 
+                variance=scaling_data[i]["var"]
+            ) for i in range(len(input_dataset_cfg['feature_names']))
+        ]
+
+        # Define function to apply scalers
+        @tf.function
+        def apply_scaler(*data, num_collections=len(input_dataset_cfg['feature_names'])):
+            dat = []
+            for i, collection in enumerate(data[:num_collections]):
+                flat_dat = scalers[i](collection.values)
+                dat.append(tf.RaggedTensor.from_row_splits(values=flat_dat, row_splits=collection.row_splits))
+            dat.append(data[num_collections])
+            return dat
+    
+        # Apply scaler to train and validation data
+        train_data = train_data.map(apply_scaler)
+        val_data = val_data.map(apply_scaler)
         
     # prefetch
     train_data = train_data.prefetch(tf.data.experimental.AUTOTUNE)
@@ -86,6 +163,9 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
     val_data = val_data.map(lambda *inputs: (inputs[:-1], tf.gather(inputs[-1], indices=class_idx, axis=-1)),  
                                 num_parallel_calls=tf.data.AUTOTUNE) 
 
+    # if tf_dataset_cfg['smart_batching_step'] is not None:
+    #     train_data, val_data = _add_weights_by_size(train_data, val_data)
+        
     # limit number of threads, otherwise (n_threads=-1) error pops up (tf.__version__ == 2.9.1)
     options = tf.data.Options()
     options.threading.private_threadpool_size = tf_dataset_cfg["n_threads"]
@@ -118,6 +198,7 @@ def _combine_datasets(datasets, load=False):
                     datasets_for_training[dataset_type].append(_dataset) 
                 else:   
                     datasets_for_training[dataset_type].append(p)
+        # datasets_for_training[dataset_type] = datasets_for_training[dataset_type][:5]
     return datasets_for_training
 
 def _combine_for_sampling(datasets):
@@ -145,7 +226,6 @@ def _combine_for_sampling(datasets):
     return datasets_for_training, sample_probas
 
 def _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
-    
     # will do smart batching based only on the sequence lengths of the **first** element (assume it to be PF candidate block)
     # NB: careful when dropping whole blocks in `embedding.yaml` -> change smart batching id here accordingly
     element_length_func = lambda *elements: tf.shape(elements[0])[0]
@@ -158,13 +238,13 @@ def _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
     
     def _element_to_bucket_id(*args):
         seq_length = element_length_func(*args)
-
         boundaries = list(bucket_boundaries)
         buckets_min = [np.iinfo(np.int32).min] + boundaries
         buckets_max = boundaries + [np.iinfo(np.int32).max]
         conditions_c = math_ops.logical_and(
-        math_ops.less_equal(buckets_min, seq_length),
-        math_ops.less(seq_length, buckets_max))
+            math_ops.less_equal(buckets_min, seq_length),
+            math_ops.less(seq_length, buckets_max)
+        )
         bucket_id = math_ops.reduce_min(array_ops.where(conditions_c))
         return bucket_id
     
@@ -234,3 +314,38 @@ def log_to_mlflow(model, cfg):
     for l in summary_list:
         if (s:='Trainable params: ') in l:
             mlflow.log_param('n_train_params', int(l.split(s)[-1].replace(',', '')))
+
+def element_length_fn(*seq):
+    # Sum of tokens in non-global + 1
+    return tf.reduce_sum([tf.shape(seq[i])[0] for i in range(3)]) + 1
+
+
+def _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
+    bucket_boundaries = np.arange(
+        tf_dataset_cfg['sequence_length_dist_start']+tf_dataset_cfg['smart_batching_step'],
+        tf_dataset_cfg['sequence_length_dist_end']+tf_dataset_cfg['smart_batching_step'],
+        tf_dataset_cfg['smart_batching_step']
+    )
+    # train_batch_sizes = (tf_dataset_cfg['train_tokens_per_batch']/bucket_boundaries).astype(int)
+    # val_batch_sizes = (tf_dataset_cfg['val_tokens_per_batch']/bucket_boundaries).astype(int)
+    batch_sizes = (tf_dataset_cfg['tokens_per_batch']/bucket_boundaries).astype(int)
+    # train_batch_sizes = np.append(train_batch_sizes, int(train_batch_sizes[-1]/2)) * global_batch_multiplier
+    # val_batch_sizes = np.append(val_batch_sizes, int(val_batch_sizes[-1]/2)) * global_batch_multiplier
+    batch_sizes = np.append(batch_sizes, int(batch_sizes[-1]/2)) * global_batch_multiplier
+    # Bucket the dataset by sequence length
+    bucketed_train_dataset = train_data.bucket_by_sequence_length(
+        element_length_fn,
+        bucket_boundaries=bucket_boundaries,  
+        bucket_batch_sizes=batch_sizes, 
+        # bucket_batch_sizes=train_batch_sizes,
+        no_padding=True
+    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
+    # Bucket the dataset by sequence length
+    bucketed_val_dataset = val_data.bucket_by_sequence_length(
+        element_length_fn,
+        bucket_boundaries=bucket_boundaries,  
+        bucket_batch_sizes=batch_sizes,
+        # bucket_batch_sizes=val_batch_sizes,
+        no_padding=True
+    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
+    return bucketed_train_dataset, bucketed_val_dataset

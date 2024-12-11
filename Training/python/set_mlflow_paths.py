@@ -2,6 +2,8 @@ import os
 from glob import glob
 import yaml
 import click
+import shutil
+# from pathlib import Path
 
 @click.command()
 @click.option('-p', '--path-to-mlflow', help='Path to local folder with mlflow experiments')
@@ -9,7 +11,17 @@ import click
 @click.option('-np', '--new-path-to-mlflow', help='New path to be set throughout meta.yaml configs for a specified mlflow experiment.')
 @click.option('-nid', '--new-exp-id', default=None, help='If passed, will also reset the current experiment id.')
 @click.option('-nn', '--new-exp-name', default=None, help='If passed, will also reset the current experiment name.')
-def main(path_to_mlflow, exp_id, new_path_to_mlflow, new_exp_id, new_exp_name):
+@click.option('-c', '--copy', is_flag=True, show_default=True, default=False, help='If set, will also copy experiment to new path.')
+def main(path_to_mlflow, exp_id, new_path_to_mlflow, new_exp_id, new_exp_name, copy):
+    run_main(path_to_mlflow, exp_id, new_path_to_mlflow, new_exp_id, new_exp_name, copy)
+
+def run_main(path_to_mlflow, exp_id, new_path_to_mlflow, new_exp_id, new_exp_name, copy):
+    if exp_id == "all":
+        dir_in_path = os.listdir(path_to_mlflow)
+        for dir_ in dir_in_path:
+            tmp_exp_path = os.path.join(path_to_mlflow, dir_, "meta.yaml")
+            if os.path.exists(tmp_exp_path) and dir_!="0":
+                run_main(path_to_mlflow, dir_, new_path_to_mlflow, new_exp_id, new_exp_name, copy)
     path_to_exp = os.path.abspath(path_to_mlflow) + '/' + exp_id
     if not os.path.exists(path_to_exp):
         raise OSError(f'{path_to_exp} does not exist')
@@ -66,9 +78,24 @@ def main(path_to_mlflow, exp_id, new_path_to_mlflow, new_exp_id, new_exp_name):
         with open(meta_file, 'w') as f:
             yaml.dump(run_data, f)
 
+    # Copy experiment folder to new location
+    if copy:
+        # create new experiment folder if necessary and transfer main meta file if not already present
+        if not os.path.exists(new_path_to_exp + "/meta.yaml"):
+            if not os.path.exists(new_path_to_exp):
+                os.mkdir(new_path_to_exp)
+            shutil.copy2(main_meta_file, new_path_to_exp)
+        # Copy over all runs
+        for run in run_folders:
+            run_name = os.path.basename(os.path.normpath(run))
+            shutil.copytree(run, f"{new_path_to_exp}/{run_name}")
+
     # rename local experiment folder to new id
-    if new_exp_id is not None:
-        os.rename(path_to_exp, renamed_path_to_exp)
+    # elif new_exp_id is not None:
+    #     os.rename(path_to_exp, renamed_path_to_exp)
+    #     path_to_exp = renamed_path_to_exp
+
+
 
 if __name__ == '__main__':
     main()

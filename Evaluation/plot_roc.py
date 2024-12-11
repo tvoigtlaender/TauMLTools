@@ -20,6 +20,7 @@ def main(cfg: DictConfig) -> None:
     path_to_mlflow = to_absolute_path(cfg.path_to_mlflow)
     mlflow.set_tracking_uri(f"file://{path_to_mlflow}")
     dmname = '_'.join([str(x) for x in cfg.dm_bin])
+    path_to_performance_file = cfg.input_path
     path_to_pdf = f'./{cfg.output_name}{dmname}.pdf' # hydra log directory
     print()
 
@@ -39,14 +40,14 @@ def main(cfg: DictConfig) -> None:
     ref_discr_cfg = cfg["discriminators"][ref_discr_run_id]
     assert isinstance(ref_curve_type, str)
 
-    reference_json = f'{path_to_mlflow}/{cfg.experiment_id}/{ref_discr_run_id}/artifacts/performance.json'
+    reference_json = f'{path_to_mlflow}/{cfg.experiment_id}/{ref_discr_run_id}/artifacts/{path_to_performance_file}'
     with open(reference_json, 'r') as f:
         ref_discr_data = json.load(f)
     ref_curve = select_curve(ref_discr_data['metrics'][ref_curve_type], 
                                 pt_min=pt_min, pt_max=pt_max, eta_min=eta_min, eta_max=eta_max, dm_bin=dm_bin, vs_type=cfg.vs_type,
                                 dataset_alias=cfg.dataset_alias)
     if ref_curve is None:
-        raise RuntimeError('[INFO] didn\'t manage to retrieve a reference curve from performance.json')
+        raise RuntimeError(f'[INFO] didn\'t manage to retrieve a reference curve from {path_to_performance_file}')
 
     # import plotting parameters from plot_roc.yaml to class init kwargs
     ref_curve['plot_cfg'] = ref_discr_cfg['plot_cfg']
@@ -59,7 +60,7 @@ def main(cfg: DictConfig) -> None:
     with PdfPages(path_to_pdf) as pdf:
         for discr_run_id, discr_cfg in cfg.discriminators.items():
             # retrieve discriminator data from corresponding json 
-            json_file = f'{path_to_mlflow}/{cfg.experiment_id}/{discr_run_id}/artifacts/performance.json'
+            json_file = f'{path_to_mlflow}/{cfg.experiment_id}/{discr_run_id}/artifacts/{path_to_performance_file}'
             with open(json_file, 'r') as f:
                 discr_data = json.load(f)
 
@@ -68,7 +69,7 @@ def main(cfg: DictConfig) -> None:
                                             pt_min=pt_min, pt_max=pt_max, eta_min=eta_min, eta_max=eta_max, dm_bin=dm_bin, vs_type=cfg.vs_type,
                                             dataset_alias=cfg.dataset_alias)
                 if discr_curve is None:
-                    print(f'[INFO] Didn\'t manage to retrieve a curve ({curve_type}) for discriminator ({discr_run_id}) from performance.json. Will proceed without plotting it.')
+                    print(f'[INFO] Didn\'t manage to retrieve a curve ({curve_type}) for discriminator ({discr_run_id}) from {path_to_performance_file}. Will proceed without plotting it.')
                     continue
                 else:
                     discr_curve['plot_cfg'] = discr_cfg['plot_cfg']

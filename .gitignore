@@ -14,6 +14,8 @@ __init__.py
 *.swp
 /soft
 .vscode
+.conda
 /.law
 /data
 /.crabOverseer
+/Evaluation/outputs

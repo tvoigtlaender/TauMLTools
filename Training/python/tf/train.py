@@ -8,18 +8,23 @@ from omegaconf import DictConfig
 from sklearn.metrics import roc_auc_score
 
 import tensorflow as tf
-import tensorflow_addons as tfa
+from tensorflow.keras import mixed_precision
+policy = mixed_precision.Policy('mixed_float16')
+mixed_precision.set_global_policy(policy)
+print('Compute dtype: %s' % policy.compute_dtype)
+print('Variable dtype: %s' % policy.variable_dtype)
 
 from models.taco import TacoNet
 from models.transformer import Transformer, CustomSchedule
 from models.particle_net import ParticleNet
 from utils.training import compose_datasets, log_to_mlflow
-
+# from checkpointer.keras_callback import KerasCheckpointerCallback
 import mlflow
 mlflow.tensorflow.autolog(log_models=False) 
 
 @hydra.main(config_path='configs', config_name='train')
 def main(cfg: DictConfig) -> None:
+    print(cfg)
     cpus = tf.config.list_physical_devices('CPU')
     if cpus:
         cpu_config = cfg["cpu"]
@@ -27,7 +32,7 @@ def main(cfg: DictConfig) -> None:
         n_cpus = int(cpu_config["cores"])
         if not "OMP_NUM_THREADS" in os.environ:
           print('"OMP_NUM_THREADS" is not set defaulting to a maximum of 1 CPU core.')
-          cpu_max = 1
+          cpu_max = 4
         else:
           cpu_max = int(os.getenv("OMP_NUM_THREADS"))
         if n_cpus > cpu_max:
@@ -94,6 +99,7 @@ def main(cfg: DictConfig) -> None:
         with open(cfg['input_dataset_cfg'], "r") as f:
             input_dataset_cfg = yaml.safe_load(f)
 
+        checkpoint_path = 'tmp_checkpoints'
         with use_strategy.scope():
             # load datasets 
             train_data, val_data = compose_datasets(cfg["datasets"], cfg["tf_dataset_cfg"], len(logical_gpus), input_dataset_cfg)
@@ -106,12 +112,60 @@ def main(cfg: DictConfig) -> None:
                 model = TacoNet(feature_name_to_idx, cfg["model"]["kwargs"]["encoder"], cfg["model"]["kwargs"]["decoder"])
             elif cfg["model"]["type"] == 'transformer':
                 model = Transformer(feature_name_to_idx, cfg["model"]["kwargs"]["encoder"], cfg["model"]["kwargs"]["decoder"])
+            elif cfg["model"]["type"] == 'transformer_dynamic':
+                tf_dataset_cfg = cfg["tf_dataset_cfg"]
+                max_batch_size = tf_dataset_cfg['tokens_per_batch'] / (tf_dataset_cfg['sequence_length_dist_start']+tf_dataset_cfg['smart_batching_step'])
+                class Transformer_dynamic(Transformer):
+                    def __init__(self, feature_name_to_idx, encoder_kwargs, decoder_kwargs, max_batch_size):
+                        super().__init__(feature_name_to_idx, encoder_kwargs, decoder_kwargs)
+                        self.max_batch_size = max_batch_size
+                        
+                    def train_step(self, data):
+                        # Unpack the data. Assumes data is (inputs, labels).
+                        x, y = data
+
+                        # Record the operations for automatic differentiation.
+                        with tf.GradientTape() as tape:
+                            y_pred = self(x, training=True)  # Forward pass
+                            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+
+                        # Compute gradients
+                        gradients = tape.gradient(loss, self.trainable_variables)
+                        
+                        # Get the current batch size
+                        batch_size = tf.cast(len(gradients), tf.float32)
+                        
+                        # Scale the gradients based on the ratio between batch_size and nominal_batch_size
+                        scaling_factor = batch_size / self.max_batch_size
+                        scaled_gradients = [grad * scaling_factor for grad in gradients]
+                        
+                        # Apply gradients to update model weights
+                        self.optimizer.apply_gradients(zip(scaled_gradients, self.trainable_variables))
+                                # Update metrics (includes the metric that tracks the loss)
+
+                        # for metric in self.metrics:
+                        #     if metric.name == "loss":
+                        #         metric.update_state(loss)
+                        #     else:
+                        #         metric.update_state(y, y_pred)
+
+                        # Update the metrics.
+                        self.compiled_metrics.update_state(y, y_pred)
+                        
+                        # Return a dictionary of metric results.
+                        return {m.name: m.result() for m in self.metrics}
+                
+                model = Transformer_dynamic(feature_name_to_idx, cfg["model"]["kwargs"]["encoder"], cfg["model"]["kwargs"]["decoder"], max_batch_size)
+
             elif cfg['model']['type'] == 'particle_net':
                 model = ParticleNet(feature_name_to_idx, cfg['model']['kwargs']['encoder'], cfg['model']['kwargs']['decoder'])
             else:
                 raise RuntimeError('Failed to infer model type')
-            X_, _ = next(iter(train_data))
-            model(X_) # init it for correct autologging with mlflow
+            iterer = iter(train_data)
+            X_, _ = next(iterer)
+            out1 = model(X_) # init it for correct autologging with mlflow
+            # X2_, _ = next(iterer)
+            # out2 = model(X2_) # init it for correct autologging with mlflow
 
             # LR schedule
             if cfg['schedule'] is None: 
@@ -135,15 +189,17 @@ def main(cfg: DictConfig) -> None:
             elif cfg['optimiser']=='sgd':
                 opt = tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=cfg['momentum'], nesterov=cfg['nesterov'])
             elif cfg['optimiser']=='adamw':
+                import tensorflow_addons as tfa
                 opt = tfa.optimizers.AdamW(weight_decay=cfg['weight_decay'], learning_rate=learning_rate, beta_1=cfg['beta_1'], beta_2=cfg['beta_2'], epsilon=cfg['epsilon'])
             elif cfg['optimiser']=='radam':
+                import tensorflow_addons as tfa
                 opt = tfa.optimizers.RectifiedAdam(weight_decay=cfg['weight_decay'], learning_rate=learning_rate, beta_1=cfg['beta_1'], beta_2=cfg['beta_2'], epsilon=cfg['epsilon'])
             else:
                 raise RuntimeError(f"Unknown value for optimiser: {cfg['optimiser']}. Only \'sgd\' and \'adam\' are supported.")
+            # opt = mixed_precision.LossScaleOptimizer(opt, dynamic=True)
 
             # callbacks, compile, fit
             early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=cfg["min_delta"], patience=cfg["patience"], mode='auto', restore_best_weights=True)
-            checkpoint_path = 'tmp_checkpoints'
             model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
                 filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}",
                 save_weights_only=False,
@@ -151,12 +207,27 @@ def main(cfg: DictConfig) -> None:
                 mode='min',
                 save_freq='epoch',
                 save_best_only=False)
+            # backup_path = str(os.getcwd() + "/tmp_backup")
+            # try:
+            #     os.mkdir(backup_path)
+            # except:
+            #     pass
+            # checkpointing = KerasCheckpointerCallback( # setting up the checkpointer callback
+            #     local_checkpoint_file=backup_path, # local checkpoint file
+            #     checkpoint_every=1, # checkpointing every epoch
+            #     checkpoint_transfer_mode="xrootd", # using a shared filesystem to move hte checkpoint to a persisten storage
+            #     checkpoint_transfer_target="/store/user/tvoigtlaender/checkpoints/DeepTau/2024_aug_l",
+            #     xrootd_server_name="root://cmsdcache-kit-disk.gridka.de/",
+            # )
+
 
             path_to_hydra_logs = HydraConfig.get().run.dir
             tensorboard_logdir = f'{path_to_hydra_logs}/custom_tensorboard_logs'
-            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (100, 300))
+            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (100, 200))
 
             callbacks = [early_stopping, model_checkpoint, tensorboard_callback]
+            # callbacks = [early_stopping, model_checkpoint] #, checkpointing]
+            # callbacks = [early_stopping, model_checkpoint, tensorboard_callback] #, checkpointing]
             if cfg['schedule']=='descrease':
                 callbacks.append(lr_scheduler)
             model.compile(optimizer=opt,

@@ -32,9 +32,9 @@ sample_alias: ???
 output_filename: ${input_filename}_pred
 
 # gpu setup
-gpu_cfg: # for running on CPU specify "gpu_cfg: null" 
-  gpu_mem  : 7 # in Gb
-  gpu_index: 0
+gpu_cfg: null # for running on CPU specify "gpu_cfg: null" 
+  # gpu_mem  : 7 # in Gb
+  # gpu_index: 0
 
 # misc.
 verbose: True

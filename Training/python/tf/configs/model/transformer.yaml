@@ -2,6 +2,7 @@ defaults:
   - .@kwargs.encoder.embedding_kwargs: embedding
   - _self_
 
+# type: transformer_dynamic
 type: transformer
 name: transformer_test
 kwargs:

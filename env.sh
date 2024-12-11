@@ -89,7 +89,7 @@ action() {
 
   export ANALYSIS_PATH="$this_dir"
   export ANALYSIS_DATA_PATH="$ANALYSIS_PATH/data"
-  export X509_USER_PROXY="$ANALYSIS_DATA_PATH/voms.proxy"
+  #export X509_USER_PROXY="$ANALYSIS_DATA_PATH/x509_proxy"
 
   export PYTHONPATH="$this_dir:$PYTHONPATH"
   export LAW_HOME="$this_dir/.law"
@@ -117,7 +117,8 @@ action() {
   if [[ $MODE == *"conda"* ]]; then
     local CONDA=$(which conda 2>/dev/null)
     if [[ $CONDA = "" || $CONDA = "/usr/bin/conda" ]]; then
-      local PRIVATE_CONDA_INSTALL_DEFAULT="$ANALYSIS_PATH/soft/conda"
+      local PRIVATE_CONDA_INSTALL_DEFAULT="/work/tvoigtlaender/checkpointing/TauMLTools/soft/conda"
+      # local PRIVATE_CONDA_INSTALL_DEFAULT="$ANALYSIS_PATH/soft/conda"
       local PRIVATE_CONDA_INSTALL="$PRIVATE_CONDA_INSTALL_DEFAULT"
       if [ -f "$PRIVATE_CONDA_INSTALL_DEFAULT.ref" ]; then
         local PRIVATE_CONDA_INSTALL=$(cat "$PRIVATE_CONDA_INSTALL.ref")
@@ -170,12 +171,12 @@ action() {
       fi
       unset __conda_setup
     fi
-    tau_env_found=$(conda env list | grep -E '^tau-ml .*' | wc -l)
+    tau_env_found=$(conda env list | grep -E '^tau-ml_new .*' | wc -l)
     if (( $tau_env_found != 1 )); then
       echo "Creating tau-ml environment..."
       run_cmd conda env create -f $ANALYSIS_PATH/tau-ml-env.yaml
     fi
-    run_cmd conda activate tau-ml
+    run_cmd conda activate tau-ml_new
     ARG="$2"
     if [[ $ARG = "--update" ]]; then
       ENV_YAML="$3"

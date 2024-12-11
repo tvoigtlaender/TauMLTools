@@ -1,23 +1,26 @@
 # basic imports
 defaults:
-  - discriminator: ???
+  - discriminator: DeepTau_run3
   - selection
   - _self_
 
 # mflow run info
-path_to_mlflow: ???
-experiment_id: ???
+path_to_mlflow: /work/tvoigtlaender/mlruns/
+experiment_id: 1
 run_id: ???
-
+# path_to_mlflow: /work/tvoigtlaender/checkpointing/TauMLTools/data/Training/2024_aug_short_recompute_V1.2/files/mlruns/
+# experiment_id: 220469896414000777
+# run_id: 634aeb7306184e7eb82973e236ea967a
 # phase space region
-vs_type: ??? # jet/e/mu
+# vs_type: mu # jet/e/mu
+vs_type: ???  # jet/e/mu
 dataset_alias: ??? # alias to reference a mixture of input_samples below, e.g. tau_DY_jet_TT
-pt_bins: [[20, 100], [100, 1000]]
-eta_bins: [[0, 2.5]]
+pt_bins: [[20, 100]] #, [100, 1000]]
+eta_bins: [[0, 2.3]]
 dm_bins: [[0, 1, 2, 10, 11]]
 
 # selection
-input_branches: [ 'tau_pt', 'tau_eta', 'tau_decayMode' , 'tau_dz'] # add here WP branches if necessary 
+input_branches: [ 'tau_pt', 'tau_eta', 'tau_decayMode' , 'tau_dz'] #, 'tau_phi'] # add here WP branches if necessary 
 cuts: "(${apply_dm_cuts}) and (abs(tau_dz) < 0.2)" 
 WPs_to_require: null # null to not apply WP as selection
 # WPs_to_require: ### example for vs. jet
@@ -26,14 +29,29 @@ WPs_to_require: null # null to not apply WP as selection
 
 # inputs/paths
 input_samples: # "sample_alias": [list of strings with tau types to be selected]
-  ???: ['tau']
-  ???: ["${vs_type}"]
-path_to_input: null
-path_to_pred: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}/*_pred.h5'
-path_to_target: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}/*_pred.h5'
+  GluGluHToTauTau_M125: ['tau']
+  DYJetsToLL_M-50-amcatnloFXFX_ext2: ["e", "mu"]
+  # DYJetsToLL_M-50-amcatnloFXFX_ext2: ["mu"]
+  TTToSemiLeptonic: ["jet"]
+# input_samples: # "sample_alias": [list of strings with tau types to be selected]
+#   GluGluHToTauTau_M125/remake_oleg: ['tau']
+#   DYJetsToLL_M-50-amcatnloFXFX_ext2/remake_oleg: ["e", "mu"]
+#   # DYJetsToLL_M-50-amcatnloFXFX_ext2/remake_oleg: ["mu"]
+#   TTToSemiLeptonic/remake_oleg: ["jet"]
+# input_samples: # "sample_alias": [list of strings with tau types to be selected]
+#   GluGluHToTauTau_M125/RootToTF: ['tau']
+#   DYJetsToLL_M-50-amcatnloFXFX_ext2/RootToTF: ["e", "mu"]
+#   # DYJetsToLL_M-50-amcatnloFXFX_ext2/RootToTF: ["mu"]
+#   TTToSemiLeptonic/RootToTF: ["jet"]
+path_to_input: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}/*[!_full]/*/predictions.h5'
+path_to_pred: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}/*[!_full]/*/predictions.h5'
+path_to_target: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}/*[!_full]/*/predictions.h5'
+# path_to_input: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}**[!_full]/*/{tau_type}/predictions.h5'
+# path_to_pred: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}**[!_full]/*/{tau_type}/predictions.h5'
+# path_to_target: '${path_to_mlflow}/${experiment_id}/${run_id}/artifacts/predictions/{sample_alias}**[!_full]/*/{tau_type}/predictions.h5'
 path_to_weights_taus: null
 path_to_weights_vs_type: null
-
+output_file: performance.json
 # misc.
 roc_prune_decimal: # precision on TPR rounding 
   e: 3

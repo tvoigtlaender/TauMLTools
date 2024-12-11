@@ -14,6 +14,7 @@ from glob import glob
 from dataclasses import dataclass
 from hydra.utils import to_absolute_path
 from functools import partial
+from make_filemap import check_match_and_save
 
 @dataclass
 class RocCurve:
@@ -224,9 +225,13 @@ class PlotSetup:
 
     def add_text(self, ax, n_entries, pt_min, pt_max, eta_min, eta_max, dm_bin, period):
         header_y = 1.02
-        ax.text(0.03, 0.89 - n_entries*0.07, self.get_pt_text(pt_min, pt_max), fontsize=14, transform=ax.transAxes)
-        ax.text(0.03, 0.82 - n_entries*0.07, self.get_eta_text(eta_min, eta_max), fontsize=14, transform=ax.transAxes)
-        ax.text(0.03, 0.75 - n_entries*0.07, self.get_dm_text(dm_bin), fontsize=14, transform=ax.transAxes)
+        
+        ax.text(0.44, 0.94, self.get_pt_text(pt_min, pt_max), fontsize=14, transform=ax.transAxes)
+        ax.text(0.44, 0.87, self.get_eta_text(eta_min, eta_max), fontsize=14, transform=ax.transAxes)
+        ax.text(0.44, 0.8, self.get_dm_text(dm_bin), fontsize=14, transform=ax.transAxes)
+        # ax.text(0.43, 0.89 - n_entries*0.07, self.get_pt_text(pt_min, pt_max), fontsize=14, transform=ax.transAxes)
+        # ax.text(0.43, 0.82 - n_entries*0.07, self.get_eta_text(eta_min, eta_max), fontsize=14, transform=ax.transAxes)
+        # ax.text(0.43, 0.75 - n_entries*0.07, self.get_dm_text(dm_bin), fontsize=14, transform=ax.transAxes)
         ax.text(0.01, header_y, 'CMS', fontsize=14, transform=ax.transAxes, fontweight='bold', fontfamily='sans-serif')
         ax.text(0.12, header_y, 'Simulation Preliminary', fontsize=14, transform=ax.transAxes, fontstyle='italic',
                 fontfamily='sans-serif')
@@ -279,6 +284,7 @@ class Discriminator:
         roc, wp_roc = None, None
         if self.raw: # construct ROC curve
             fpr, tpr, thresholds = metrics.roc_curve(df['gen_tau'].values, df[self.pred_column].values, sample_weight=df.weight.values)
+            thresholds = np.where(np.isinf(thresholds), 2.0, thresholds)
             if not (np.isnan(fpr).any() or np.isnan(tpr).any()):
                 auc_score = metrics.roc_auc_score(df['gen_tau'].values, df[self.pred_column].values, sample_weight=df.weight.values)
                 roc = RocCurve()
@@ -343,16 +349,22 @@ def select_curve(curve_list, **selection):
         raise Exception(f"Failed to find a single curve for selection: {[f'{k}=={v}' for k,v in selection.items()]}")
 
 def create_df(path_to_input_file, input_branches, path_to_pred_file, path_to_target_file, path_to_weights, pred_column_prefix=None, target_column_prefix=None):
+    
+    def filter_df(df):
+        df = df[np.abs(df['tau_phi'])<2.*np.pi].reset_index(drop=True)
+        return df
+    
     def read_branches(path_to_file, tree_name, branches):
-        if not os.path.exists(path_to_input_file):
-            raise RuntimeError(f"Specified file for inputs ({path_to_input_file}) does not exist")
+        # if not os.path.exists(path_to_input_file):
+        #     raise RuntimeError(f"Specified file for inputs ({path_to_input_file}) does not exist")
         if path_to_file.endswith('.root'):
             with uproot.open(path_to_file) as f:
                 tree = f[tree_name]
                 df = tree.arrays(branches, library='pd')
             return df
         elif path_to_file.endswith('.h5') or path_to_file.endswith('.hdf5'):
-            return pd.read_hdf(path_to_file, tree_name, columns=branches)
+            return pd.read_hdf(path_to_file, "add_columns")
+            # return pd.read_hdf(path_to_file, tree_name, columns=branches)
         raise RuntimeError("Unsupported file type.")
 
     def add_group(df, group_name, path_to_file, group_column_prefix):
@@ -372,7 +384,7 @@ def create_df(path_to_input_file, input_branches, path_to_pred_file, path_to_tar
             return df
         elif group_name == 'predictions': 
             prob_tau = group_df[f'{group_column_prefix}tau'].values
-        elif group_name != 'targets':
+        elif group_name != 'labels':
             raise ValueError(f'group_name should be one of [predictions, targets, weights], got {group_name}')
         
         # add columns for predictions/targets case
@@ -384,18 +396,19 @@ def create_df(path_to_input_file, input_branches, path_to_pred_file, path_to_tar
                     prob_vs_type = group_df[group_column_prefix + tau_type].values
                     tau_vs_other_type = np.where(prob_tau > 0, prob_tau / (prob_tau + prob_vs_type), np.zeros(prob_tau.shape))
                     df[group_column_prefix + tau_type] = pd.Series(tau_vs_other_type, index=df.index)
-            elif group_name == 'targets':
+            elif group_name == 'labels':
                 df[f'gen_{tau_type}'] = group_df[node_column]
         return df
 
     # TODO: add on the fly branching creation for uproot
     df = read_branches(path_to_input_file, 'taus', input_branches)
+    # df = filter_df(df)
     if path_to_pred_file is not None:
         add_group(df, 'predictions', path_to_pred_file, pred_column_prefix)
     else:
         print(f'[INFO] path_to_pred_file=None, will proceed without reading predictions from there')
     if path_to_target_file is not None:
-        add_group(df, 'targets', path_to_target_file, target_column_prefix)
+        add_group(df, 'labels', path_to_target_file, target_column_prefix)
     else:
         print(f'[INFO] path_to_target_file=None, will proceed without reading targets from there')
     if path_to_weights is not None:
@@ -404,7 +417,7 @@ def create_df(path_to_input_file, input_branches, path_to_pred_file, path_to_tar
         df['weight'] = pd.Series(np.ones(df.shape[0]), index=df.index)
     return df
 
-def prepare_filelists(sample_alias, path_to_input, path_to_pred, path_to_target, path_to_artifacts):
+def prepare_filelists(sample_alias, path_to_input, path_to_pred, path_to_target, path_to_artifacts, tau_type):
     def find_common_suffix(l):
         if not all([isinstance(s, str) for s in l]):
             raise TypeError("Iterable for finding common suffix doesn't contain all strings")
@@ -428,19 +441,28 @@ def prepare_filelists(sample_alias, path_to_input, path_to_pred, path_to_target,
     
     # prepare list of files with target labels
     if path_to_target is not None:
-        path_to_target = os.path.abspath(to_absolute_path(fill_placeholders(path_to_target, {"{sample_alias}": sample_alias})))
-        if f'artifacts/predictions/{sample_alias}' in path_to_target: # fetch corresponding input files from mlflow logs
-            #json_filemap_name = f'{path_to_artifacts}/predictions/{sample_alias}/pred_input_filemap.json'
-            json_filemap_name = path_to_target.replace(path_to_target.split("/")[-1], 'pred_input_filemap.json')
-            if os.path.exists(json_filemap_name):
-                with open(json_filemap_name, 'r') as json_file:
-                    target_input_map = json.load(json_file)
-                    # target_common_suffix = find_common_suffix(target_input_map.keys())
-                    # target_files, input_files = zip(*sorted(target_input_map.items(), key=lambda item: partial(path_splitter, common_suffix=target_common_suffix)(item[0])))  # sort by values (target files)
-                    target_files = glob(path_to_target)
-                    input_files = [target_input_map[file] for file in target_files]
-            else:
-                raise FileNotFoundError(f'File {json_filemap_name} does not exist. Please make sure that input<->target file mapping is stored in mlflow run artifacts.')
+        # path_to_target = os.path.abspath(to_absolute_path(path_to_target.format(sample_alias=sample_alias, tau_type=tau_type)))
+        # path_to_target = os.path.abspath(to_absolute_path(fill_placeholders(path_to_target, {"{sample_alias}": sample_alias})))
+        
+        if path_to_input==path_to_pred==path_to_target:
+            path_to_target = os.path.abspath(to_absolute_path(path_to_target.format(sample_alias=sample_alias, tau_type=tau_type)))
+            data_files = glob(path_to_target)
+            target_files = data_files
+            input_files = data_files
+        # elif f'artifacts/predictions/{sample_alias}' in path_to_target: # fetch corresponding input files from mlflow logs
+        #     json_filemap_name = f'{path_to_artifacts}/predictions/{sample_alias}/pred_input_filemap_{tau_type}.json'
+        #     # json_filemap_name = path_to_target.replace("/".join(path_to_target.split("/")[-2:]), 'pred_input_filemap.json')
+        #     if not os.path.exists(json_filemap_name):
+        #         check_match_and_save(f'{path_to_artifacts}/predictions/{sample_alias}/*/{tau_type}/predictions.h5', f'{path_to_artifacts}/predictions/{sample_alias}/*/{tau_type}/predictions.h5', json_filemap_name)
+        #     if os.path.exists(json_filemap_name):
+        #         with open(json_filemap_name, 'r') as json_file:
+        #             target_input_map = json.load(json_file)
+        #             # target_common_suffix = find_common_suffix(target_input_map.keys())
+        #             # target_files, input_files = zip(*sorted(target_input_map.items(), key=lambda item: partial(path_splitter, common_suffix=target_common_suffix)(item[0])))  # sort by values (target files)
+        #             target_files = glob(path_to_target)
+        #             input_files = [target_input_map[file] for file in target_files]
+        #     else:
+        #         raise FileNotFoundError(f'File {json_filemap_name} does not exist. Please make sure that input<->target file mapping is stored in mlflow run artifacts.')
         else: # use paths from cfg 
             raise FileNotFoundError(f'Target files are not in the mlflow run artifacts.')
             # target_common_suffix = find_common_suffix(glob(path_to_target))
@@ -457,7 +479,7 @@ def prepare_filelists(sample_alias, path_to_input, path_to_pred, path_to_target,
         path_to_pred = os.path.abspath(to_absolute_path(fill_placeholders(path_to_pred, {"{sample_alias}": sample_alias})))
         # pred_common_suffix = find_common_suffix(glob(path_to_pred))
         # pred_files = sorted(glob(path_to_pred), key=partial(path_splitter, common_suffix=pred_common_suffix))
-        if f'artifacts/predictions/{sample_alias}' in path_to_pred and path_to_pred==path_to_target:
+        if f'artifacts/predictions/{sample_alias}' in path_to_pred and path_to_pred.format(tau_type=tau_type)==path_to_target:
             pred_files = target_files
         else:
             raise FileNotFoundError('path to target and prediction should be the same')   
