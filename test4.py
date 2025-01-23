@@ -83,28 +83,17 @@ a_preprocessed['global']['tau_neutralIsoPtSumWeight_over_neutralIsoPtSum'] = ak.
 a_preprocessed['global']['tau_neutralIsoPtSumWeightdR03_over_neutralIsoPtSum'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumWeightdR03']/a['tau_neutralIsoPtSum']), 0)
 a_preprocessed['global']['tau_neutralIsoPtSumdR03_over_dR05'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumdR03']/a['tau_neutralIsoPtSum']), 0)
 
-# a_preprocessed['global']['tau_sv_minus_pv_x'] = ak.where((a['tau_hasSecondaryVertex']), (a['tau_sv_x']-a['pv_x']), 0)
-# a_preprocessed['global']['tau_sv_minus_pv_y'] = ak.where((a['tau_hasSecondaryVertex']), (a['tau_sv_y']-a['pv_y']), 0)
-# a_preprocessed['global']['tau_sv_minus_pv_z'] = ak.where((a['tau_hasSecondaryVertex']), (a['tau_sv_z']-a['pv_z']), 0)
-
-tau_dxy_valid = (is_finite(a['tau_dxy']) & (a['tau_dxy'] > -10) & is_finite(a['tau_dxy_error']) & (a['tau_dxy_error'] > 0)) #Redundant
+tau_dxy_valid = (is_finite(a['tau_dxy']) & (a['tau_dxy'] > -10) & is_finite(a['tau_dxy_error']) & (a['tau_dxy_error'] > 0)) #Used
 a_preprocessed['global']['tau_dxy_valid'] = ak.values_astype(tau_dxy_valid, np.float32)
 a_preprocessed['global']['tau_dxy'] = ak.where(tau_dxy_valid, (a['tau_dxy']), 0)
 a_preprocessed['global']['tau_dxy_sig'] = ak.where(tau_dxy_valid, (np.abs(a['tau_dxy'])/a['tau_dxy_error']), 0)
 
-tau_ip3d_valid = (is_finite(a['tau_ip3d']) & (a['tau_ip3d'] > -10) & is_finite(a['tau_ip3d_error']) & (a['tau_ip3d_error'] > 0)) #Redundant
-a_preprocessed['global']['tau_ip3d_valid'] = ak.values_astype(tau_ip3d_valid, np.float32)
-a_preprocessed['global']['tau_ip3d'] = ak.where(tau_ip3d_valid, (a['tau_ip3d']), 0)
-a_preprocessed['global']['tau_ip3d_sig'] = ak.where(tau_ip3d_valid, (np.abs(a['tau_ip3d'])/a['tau_ip3d_error']), 0)
+a_preprocessed['global']['tau_ip3d_sig'] = np.abs(a['tau_ip3d'])/a['tau_ip3d_error']
 
 tau_dz_sig_valid = (is_finite(a['tau_dz']) & is_finite(a['tau_dz_error']) & (a['tau_dz_error'] > 0)) #Used
 a_preprocessed['global']['tau_dz_sig_valid'] = ak.values_astype(tau_dz_sig_valid, np.float32)
 # a_preprocessed['global']['tau_dz'] = ak.where(tau_dz_sig_valid, (a['tau_dz']), 0)
 a_preprocessed['global']['tau_dz_sig'] = ak.where(tau_dz_sig_valid, (np.abs(a['tau_dz'])/a['tau_dz_error']), 0)
-
-tau_e_ratio_valid = (is_finite(a['tau_e_ratio']) & ['tau_e_ratio'] > 0) #Redundant
-a_preprocessed['global']['tau_e_ratio_valid'] = ak.values_astype(tau_e_ratio_valid, np.float32)
-a_preprocessed['global']['tau_e_ratio'] = ak.where(tau_e_ratio_valid, (a['tau_e_ratio']), 0)
 
 tau_gj_angle_diff_valid = (a['tau_gj_angle_diff'] >= 0) # Used
 a_preprocessed['global']['tau_gj_angle_diff_valid'] = ak.values_astype(tau_gj_angle_diff_valid, np.float32)
@@ -128,7 +117,7 @@ a_preprocessed['pfCand']['r'] = np.sqrt(np.square(pf_deta) + np.square(pf_dphi))
 a_preprocessed['pfCand']['theta'] = np.arctan2(pf_dphi, pf_deta) # dphi -> y, deta -> x
 a_preprocessed['pfCand']['particle_type'] = a['pfCand_particleType'] - 1
 
-vertex_z_valid = is_finite(a['pfCand_vertex_z']) #Redundant
+vertex_z_valid = is_finite(a['pfCand_vertex_z']) #Used
 a_preprocessed['pfCand']['vertex_dx'] = a['pfCand_vertex_x'] - a['pv_x']
 a_preprocessed['pfCand']['vertex_dy'] = a['pfCand_vertex_y'] - a['pv_y']
 a_preprocessed['pfCand']['vertex_dz'] = ak.where(vertex_z_valid, (a['pfCand_vertex_z'] - a['pv_z']), 0)
@@ -138,14 +127,10 @@ a_preprocessed['pfCand']['vertex_dz_tauFL'] = ak.where(vertex_z_valid, (a['pfCan
 
 has_track_details = (a['pfCand_hasTrackDetails'] == 1)
 has_track_details_track_ndof = has_track_details * (a['pfCand_track_ndof'] > 0) # Used
-has_track_details_dxy_finite = has_track_details * is_finite(a['pfCand_dxy']) #Redundant
 has_track_details_dxy_sig_finite = has_track_details * (is_finite(a['pfCand_dxy']) & is_finite(a['pfCand_dxy_error'])) #Used
-has_track_details_dz_finite = has_track_details * is_finite(a['pfCand_dz']) #Redundant 
 has_track_details_dz_sig_finite = has_track_details * (is_finite(a['pfCand_dz']) & is_finite(a['pfCand_dz_error'])) #Used
-a_preprocessed['pfCand']['dxy'] = ak.where(has_track_details_dxy_finite, a['pfCand_dxy'], 0)
-a_preprocessed['pfCand']['dxy_sig_valid'] = ak.values_astype(has_track_details_dxy_finite, np.float32)
+a_preprocessed['pfCand']['dxy_sig_valid'] = ak.values_astype(has_track_details_dxy_sig_finite, np.float32)
 a_preprocessed['pfCand']['dxy_sig'] = ak.where(has_track_details_dxy_sig_finite, (np.abs(a['pfCand_dxy'])/a['pfCand_dxy_error']), 0)
-a_preprocessed['pfCand']['dz'] = ak.where(has_track_details_dz_finite, a['pfCand_dz'], 0)
 a_preprocessed['pfCand']['dz_sig_valid'] = ak.values_astype(has_track_details_dz_sig_finite, np.float32)
 a_preprocessed['pfCand']['dz_sig'] = ak.where(has_track_details_dz_sig_finite, (np.abs(a['pfCand_dz'])/a['pfCand_dz_error']), 0)
 a_preprocessed['pfCand']['track_ndof_valid'] = ak.values_astype(has_track_details_track_ndof, np.float32)
@@ -208,17 +193,14 @@ a_preprocessed['muon']['r'] = np.sqrt(np.square(muon_deta) + np.square(muon_dphi
 a_preprocessed['muon']['theta'] = np.arctan2(muon_dphi, muon_deta) # dphi -> y, deta -> x
 a_preprocessed['muon']['particle_type'] = 8*ak.ones_like(a['muon_pt']) # assuming PF candidate types are [0..6]
 
-muon_dxy_sig_finite = is_finite(np.abs(a['muon_dxy'])) & is_finite(a['muon_dxy_error']) #Redundant
-a_preprocessed['muon']['dxy_sig'] = ak.where(muon_dxy_sig_finite, (np.abs(a['muon_dxy'])/a['muon_dxy_error']), 0)
+a_preprocessed['muon']['dxy_sig'] = np.abs(a['muon_dxy'])/a['muon_dxy_error']
 
 muon_normalizedChi2_valid = ((a['muon_normalizedChi2'] > 0) * is_finite(a['muon_normalizedChi2'])) #Used
 a_preprocessed['muon']['normalizedChi2_valid'] = ak.values_astype(muon_normalizedChi2_valid, np.float32)
 a_preprocessed['muon']['normalizedChi2'] = ak.where(muon_normalizedChi2_valid, a['muon_normalizedChi2'], 0)
 a_preprocessed['muon']['numberOfValidHits'] = ak.where(muon_normalizedChi2_valid, a['muon_numberOfValidHits'], 0)
 
-muon_pfEcalEnergy_valid = is_finite(a['muon_pfEcalEnergy']) & (a['muon_pfEcalEnergy'] >= 0) #Redundant
-a_preprocessed['muon']['pfEcalEnergy_valid'] = ak.values_astype(muon_pfEcalEnergy_valid, np.float32)
-a_preprocessed['muon']['rel_pfEcalEnergy'] = ak.where(muon_pfEcalEnergy_valid, (a['muon_pfEcalEnergy']/a['muon_pt']), 0)
+a_preprocessed['muon']['rel_pfEcalEnergy'] = a['muon_pfEcalEnergy']/a['muon_pt']
 
 add_columns = {_f: a[_f] for _f in add_feature_names} if add_feature_names is not None else None
 
