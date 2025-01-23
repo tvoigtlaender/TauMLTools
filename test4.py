@@ -2,17 +2,30 @@ import dask
 import numpy as np
 import awkward as ak
 import uproot
+import yaml
 
 # np.seterr("raise")
 
-path_DY = "root://eoscms.cern.ch//eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1.root"
+# path_DY = "root://eoscms.cern.ch//eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1.root"
 path_SuM = "root://eosuser.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_0.root"
 
-a = uproot.dask(f"{path_SuM}:taus",step_size="1 GB", timeout=300)
+cfg_path = "/work/tvoigtlaender/TauTransformerComparison/dataloader_dev/TauMLTools/cfg.yaml"
 
-used_inputs = ["genLepton_kind",'tau_gj_angle_diff', 'pfCand_pt', 'ele_full5x5_sigmaEtaEta', 'pfCand_dxy', 'ele_full5x5_e2x5Top', 'ele_eRight', 'ele_sigmaIetaIeta', 'tau_ip3d', 'ele_full5x5_e1x5', 'pv_y', 'ele_full5x5_eRight', 'ele_eBottom', 'ele_full5x5_r9', 'muon_numberOfValidHits', 'pfCand_track_chi2', 'ele_full5x5_sigmaIphiIphi', 'tau_flightLength_y', 'tau_eta', 'pfCand_eta', 'ele_e1x5', 'ele_ecalEnergy', 'muon_pfEcalEnergy', 'tau_chargedIsoPtSum', 'ele_hcalDepth1OverEcalBc', 'ele_eta', 'tau_sv_z', 'tau_flightLength_z', 'ele_closestCtfTrack_numberOfValidHits', 'ele_cc_gamma_energy', 'ele_full5x5_e2x5Bottom', 'tau_neutralIsoPtSumdR03', 'tau_dxy_error', 'ele_full5x5_e2x5Left', 'tau_leadChargedCand_etaAtEcalEntrance', 'ele_full5x5_hcalDepth1OverEcalBc', 'tau_decayMode', 'ele_full5x5_sigmaIetaIphi', 'pfCand_dz_error', 'pfCand_hasTrackDetails', 'pfCand_dz', 'ele_full5x5_hcalDepth2OverEcal', 'ele_ecalEnergy_error', 'ele_sigmaIphiIphi', 'ele_sigmaEtaEta', 'tau_ip3d_error', 'muon_phi', 'ele_cc_n_gamma', 'tau_flightLength_x', 'tau_pt', 'ele_e2x5Max', 'ele_trackMomentumAtCalo', 'ele_full5x5_hcalDepth1OverEcal', 'tau_neutralIsoPtSumWeight', 'ele_trackMomentumAtVtxWithConstraint', 'muon_pt', 'ele_trackMomentumAtVtx', 'ele_full5x5_e2x5Right', 'pfCand_vertex_z', 'pv_x', 'ele_trackMomentumOut', 'tau_dz', 'ele_r9', 'tau_neutralIsoPtSum', 'ele_full5x5_eBottom', 'ele_full5x5_eLeft', 'ele_eLeft', 'muon_dxy', 'ele_hcalDepth1OverEcal', 'muon_dxy_error', 'pfCand_vertex_y', 'muon_eta', 'ele_full5x5_eTop', 'pfCand_track_ndof', 'ele_eTop', 'ele_full5x5_e2x5Max', 'pv_z', 'ele_full5x5_hcalDepth2OverEcalBc', 'ele_gsfTrack_pt_error', 'muon_normalizedChi2', 'ele_trackMomentumAtEleClus', 'ele_hcalDepth2OverEcal', 'tau_e_ratio', 'pfCand_vertex_x', 'tau_sv_y', 'tau_hasSecondaryVertex', 'ele_gsfTrack_pt', 'tau_dxy', 'pfCand_dxy_error', 'ele_phi', 'ele_closestCtfTrack_normalizedChi2', 'ele_cc_ele_energy', 'tau_sv_x', 'ele_e5x5', 'pfCand_phi', 'ele_pt', 'ele_sigmaIetaIphi', 'ele_hcalDepth2OverEcalBc', 'tau_chargedIsoPtSumdR03', 'pfCand_particleType', 'ele_full5x5_sigmaIetaIeta', 'tau_neutralIsoPtSumWeightdR03', 'tau_dz_error', 'ele_full5x5_e5x5', 'tau_phi', 'tau_mass']
+with open(cfg_path, 'r') as stream:
+    feature_names = yaml.safe_load(stream)['feature_names']
 
-# ['dxy', 'tau_mass', 'tau_chargedIsoPtSumdR03_over_dR05', 'tau_pt_weighted_dphi_strip', 'tau_neutralIsoPtSumdR03_over_dR05', 'full5x5_hcalDepth2OverEcalBc', 'eSeedClusterOverP', 'mvaInput_sigmaEtaEta', 'vertex_dx', 'tau_n_photons', 'r', 'lostInnerHits', 'particle_type', 'cc_n_gamma', 'eLeft', 'full5x5_sigmaIphiIphi', 'cc_gamma_rel_energy', 'vertex_dz', 'cc_ele_rel_energy', 'tau_pt_weighted_deta_strip', 'hcalDepth2OverEcalBc', 'n_matches_CSC_2', 'full5x5_eLeft', 'full5x5_eRight', 'tau_leadingTrackNormChi2', 'tau_leadChargedCand_etaAtEcalEntrance_minus_tau_eta', 'full5x5_e2x5Left', 'tau_n_charged_prongs', 'n_matches_RPC_4', 'sigmaIetaIphi', 'full5x5_hcalDepth1OverEcal', 'tau_gj_angle_diff_valid', 'tau_E_over_pt', 'tau_pt', 'track_ndof', 'rel_gsfTrack_pt', 'tau_dz_sig', 'full5x5_e2x5Bottom', 'n_hits_CSC_1', 'rel_trackMomentumOut', 'tau_ip3d_valid', 'full5x5_hcalDepth2OverEcal', 'n_hits_DT_4', 'tau_charge', 'hcalDepth1OverEcalBc', 'tau_chargedIsoPtSum', 'tau_ip3d', 'tau_dz', 'full5x5_e2x5Max', 'n_hits_DT_2', 'full5x5_e5x5', 'n_hits_RPC_4', 'n_hits_RPC_2', 'rel_pt', 'tau_dz_sig_valid', 'hasTrackDetails', 'chi2_ndof', 'full5x5_eBottom', 'theta', 'n_matches_DT_3', 'tau_dxy', 'tau_dxy_sig', 'pvAssociationQuality', 'tauLeadChargedHadrCand', 'e1x5', 'vertex_dy', 'vertex_dx_tauFL', 'e5x5', 'eRight', 'n_hits_RPC_3', 'tau_e_ratio_valid', 'mvaInput_earlyBrem', 'nPixelHits', 'sigmaEtaEta', 'rel_pfEcalEnergy', 'n_matches_DT_1', 'vertex_dy_tauFL', 'cc_valid', 'deltaPhiEleClusterTrackAtCalo', 'tau_dxy_valid', 'tau_gj_angle_diff', 'tau_n_neutral_prongs', 'gsfTrack_normalizedChi2', 'tau_pt_weighted_dr_iso', 'n_matches_RPC_2', 'tau_flightLength_x', 'n_matches_CSC_3', 'charge', 'tau_flightLength_z', 'n_matches_CSC_1', 'deltaEtaSeedClusterTrackAtCalo', 'tau_eta', 'eEleClusterOverPout', 'eTop', 'tau_flightLength_sig', 'tau_ip3d_sig', 'puppiWeight', 'sigmaIetaIeta', 'pfEcalEnergy_valid', 'full5x5_e1x5', 'tau_photonPtSumOutsideSignalCone', 'deltaPhiSuperClusterTrackAtVtx', 'mvaInput_hadEnergy', 'tau_neutralIsoPtSumWeightdR03_over_neutralIsoPtSum', 'tau_emFraction', 'full5x5_sigmaEtaEta', 'full5x5_e2x5Right', 'normalizedChi2_valid', 'tau_neutralIsoPtSumWeight_over_neutralIsoPtSum', 'full5x5_e2x5Top', 'e2x5Max', 'caloCompatibility', 'n_hits_CSC_3', 'dz', 'closestCtfTrack_normalizedChi2', 'tau_sv_minus_pv_y', 'eSuperClusterOverP', 'tau_e_ratio', 'full5x5_r9', 'tau_flightLength_y', 'hcalFraction', 'gsfTrack_pt_sig', 'rel_trackMomentumAtEleClus', 'nHits', 'r9', 'mvaInput_lateBrem', 'has_closestCtfTrack', 'tau_sv_minus_pv_x', 'segmentCompatibility', 'tau_hasSecondaryVertex', 'rel_trackMomentumAtVtx', 'rawCaloFraction', 'nPixelLayers', 'numberOfValidHits', 'deltaEtaEleClusterTrackAtCalo', 'nStripLayers', 'n_matches_RPC_3', 'normalizedChi2', 'n_matches_DT_4', 'full5x5_sigmaIetaIeta', 'eSeedClusterOverPout', 'vertex_dz_tauFL', 'n_hits_CSC_2', 'deltaEtaSuperClusterTrackAtVtx', 'eBottom', 'n_hits_CSC_4', 'full5x5_sigmaIetaIphi', 'n_hits_DT_3', 'tau_sv_minus_pv_z', 'n_hits_RPC_1', 'sigmaIphiIphi', 'rel_trackMomentumAtVtxWithConstraint', 'n_matches_DT_2', 'tau_neutralIsoPtSum', 'full5x5_hcalDepth1OverEcalBc', 'hcalDepth2OverEcal', 'full5x5_eTop', 'fromPV', 'closestCtfTrack_numberOfValidHits', 'n_matches_CSC_4', 'tau_footprintCorrection', 'gsfTrack_numberOfValidHits', 'tau_pt_weighted_dr_signal', 'tau_inside_ecal_crack', 'tau_puCorrPtSum', 'mvaInput_deltaEta', 'ecalEnergy_sig', 'n_hits_DT_1', 'rawHcalFraction', 'rho', 'deltaPhiSeedClusterTrackAtCalo', 'rel_trackMomentumAtCalo', 'rel_ecalEnergy', 'n_matches_RPC_1', 'dz_sig', 'hcalDepth1OverEcal', 'dxy_sig']
+use_dask = True
+
+# if use_dask:
+a = uproot.dask(f"{path_SuM}:taus",step_size="1 GB", timeout=3000)
+    
+# else:
+    
+#     a = uproot.open(f"{path_SuM}:taus",step_size="1 GB", timeout=3000)
+
+#     used_inputs = ["genLepton_kind",'tau_gj_angle_diff', 'pfCand_pt', 'ele_full5x5_sigmaEtaEta', 'pfCand_dxy', 'ele_full5x5_e2x5Top', 'ele_eRight', 'ele_sigmaIetaIeta', 'tau_ip3d', 'ele_full5x5_e1x5', 'pv_y', 'ele_full5x5_eRight', 'ele_eBottom', 'ele_full5x5_r9', 'muon_numberOfValidHits', 'pfCand_track_chi2', 'ele_full5x5_sigmaIphiIphi', 'tau_flightLength_y', 'tau_eta', 'pfCand_eta', 'ele_e1x5', 'ele_ecalEnergy', 'muon_pfEcalEnergy', 'tau_chargedIsoPtSum', 'ele_hcalDepth1OverEcalBc', 'ele_eta', 'tau_sv_z', 'tau_flightLength_z', 'ele_closestCtfTrack_numberOfValidHits', 'ele_cc_gamma_energy', 'ele_full5x5_e2x5Bottom', 'tau_neutralIsoPtSumdR03', 'tau_dxy_error', 'ele_full5x5_e2x5Left', 'tau_leadChargedCand_etaAtEcalEntrance', 'ele_full5x5_hcalDepth1OverEcalBc', 'tau_decayMode', 'ele_full5x5_sigmaIetaIphi', 'pfCand_dz_error', 'pfCand_hasTrackDetails', 'pfCand_dz', 'ele_full5x5_hcalDepth2OverEcal', 'ele_ecalEnergy_error', 'ele_sigmaIphiIphi', 'ele_sigmaEtaEta', 'tau_ip3d_error', 'muon_phi', 'ele_cc_n_gamma', 'tau_flightLength_x', 'tau_pt', 'ele_e2x5Max', 'ele_trackMomentumAtCalo', 'ele_full5x5_hcalDepth1OverEcal', 'tau_neutralIsoPtSumWeight', 'ele_trackMomentumAtVtxWithConstraint', 'muon_pt', 'ele_trackMomentumAtVtx', 'ele_full5x5_e2x5Right', 'pfCand_vertex_z', 'pv_x', 'ele_trackMomentumOut', 'tau_dz', 'ele_r9', 'tau_neutralIsoPtSum', 'ele_full5x5_eBottom', 'ele_full5x5_eLeft', 'ele_eLeft', 'muon_dxy', 'ele_hcalDepth1OverEcal', 'muon_dxy_error', 'pfCand_vertex_y', 'muon_eta', 'ele_full5x5_eTop', 'pfCand_track_ndof', 'ele_eTop', 'ele_full5x5_e2x5Max', 'pv_z', 'ele_full5x5_hcalDepth2OverEcalBc', 'ele_gsfTrack_pt_error', 'muon_normalizedChi2', 'ele_trackMomentumAtEleClus', 'ele_hcalDepth2OverEcal', 'tau_e_ratio', 'pfCand_vertex_x', 'tau_sv_y', 'tau_hasSecondaryVertex', 'ele_gsfTrack_pt', 'tau_dxy', 'pfCand_dxy_error', 'ele_phi', 'ele_closestCtfTrack_normalizedChi2', 'ele_cc_ele_energy', 'tau_sv_x', 'ele_e5x5', 'pfCand_phi', 'ele_pt', 'ele_sigmaIetaIphi', 'ele_hcalDepth2OverEcalBc', 'tau_chargedIsoPtSumdR03', 'pfCand_particleType', 'ele_full5x5_sigmaIetaIeta', 'tau_neutralIsoPtSumWeightdR03', 'tau_dz_error', 'ele_full5x5_e5x5', 'tau_phi', 'tau_mass']
+    
+#     a = a.arrays(used_inputs, library="ak", how="zip")
 
 def get_type(col):
     # Get the primitive type of the given column
@@ -23,7 +36,7 @@ def get_type(col):
     else:
         raise ValueError(f"Unsupported dimension: {col.ndim}")
 
-def is_finite(col):
+def is_finite(col, dask_array=True):
     # Get the min and max values for the given column
     primitive_type_col = get_type(col)
     if np.issubdtype(primitive_type_col, np.integer):
@@ -49,22 +62,9 @@ def has_values(col):
 # Filter non_valid tau candidates with no tau information
 a = a[is_finite(a["tau_pt"])]
 
-# # Filter for min_value of float32
-# b = {}
-# for input_i in used_inputs:
-#     if (input_i.startswith("pfCand_") or input_i.startswith("ele_") or input_i.startswith("muon_")):
-#         pass
-#         #b[input_i]=c[input_i][ak.all(c[input_i]!=-3.4028235e+38,axis=1)]
-#     else:
-#         # pass
-#         b[input_i]=c[input_i][is_finite(c[input_i])]
-# b_done = dask.compute(b)
-# b_valid = [(i,len(j)) for i,j in b_done[0].items()]
-# print(b_valid)
-
 # dictionary to store preprocessed features (per feature type)
 a_preprocessed = {feature_type: {} for feature_type in feature_names.keys()}
-    
+
 # fill lazily original features which don't require preprocessing  
 for feature_type, feature_list in feature_names.items():
     for feature_name in feature_list:
@@ -72,8 +72,7 @@ for feature_type, feature_list in feature_names.items():
             f = f'{feature_type}_{feature_name}' if feature_type != 'global' else feature_name
             a_preprocessed[feature_type][feature_name] = a[f]
         except:
-            if verbose:
-                print(f'        {f} not found in input ROOT file, will skip it') 
+            print(f'        {f} not found in input ROOT file, will skip it') 
 
 a_preprocessed['global']['tau_E_over_pt'] = np.sqrt((a['tau_pt']*np.cosh(a['tau_eta']))*(a['tau_pt']*np.cosh(a['tau_eta'])) + a['tau_mass']*a['tau_mass'])/a['tau_pt']
 a_preprocessed['global']['tau_n_charged_prongs'] = a['tau_decayMode']//5 + 1
@@ -172,7 +171,7 @@ a_preprocessed['ele']['has_closestCtfTrack'] = ak.values_astype(ele_has_closestC
 a_preprocessed['ele']['closestCtfTrack_normalizedChi2'] = ak.where(ele_has_closestCtfTrack, a['ele_closestCtfTrack_normalizedChi2'], 0)
 a_preprocessed['ele']['closestCtfTrack_numberOfValidHits'] = ak.where(ele_has_closestCtfTrack, a['ele_closestCtfTrack_numberOfValidHits'], 0)
 
-ele_mva_valid = is_finite(a['e5x5']) #Used
+ele_mva_valid = is_finite(a['ele_e5x5']) #Used
 ele_features = ['sigmaEtaEta', 'sigmaIetaIeta', 'sigmaIphiIphi', 'sigmaIetaIphi', 'e1x5', 'e2x5Max', 'e5x5', 'r9', 'hcalDepth1OverEcal', 'hcalDepth2OverEcal', 'hcalDepth1OverEcalBc', 'hcalDepth2OverEcalBc','eLeft', 'eRight', 'eBottom', 'eTop','full5x5_sigmaEtaEta', 'full5x5_sigmaIetaIeta', 'full5x5_sigmaIphiIphi', 'full5x5_sigmaIetaIphi','full5x5_e1x5', 'full5x5_e2x5Max', 'full5x5_e5x5', 'full5x5_r9','full5x5_hcalDepth1OverEcal', 'full5x5_hcalDepth2OverEcal', 'full5x5_hcalDepth1OverEcalBc', 'full5x5_hcalDepth2OverEcalBc','full5x5_eLeft', 'full5x5_eRight', 'full5x5_eBottom', 'full5x5_eTop','full5x5_e2x5Left', 'full5x5_e2x5Right', 'full5x5_e2x5Bottom', 'full5x5_e2x5Top']
 a_preprocessed['ele']['mva_valid'] = ak.values_astype(ele_mva_valid, np.float32)
 for ele_feature in ele_features:
@@ -202,20 +201,15 @@ a_preprocessed['muon']['numberOfValidHits'] = ak.where(muon_normalizedChi2_valid
 
 a_preprocessed['muon']['rel_pfEcalEnergy'] = a['muon_pfEcalEnergy']/a['muon_pt']
 
-add_columns = {_f: a[_f] for _f in add_feature_names} if add_feature_names is not None else None
+# add_columns = {_f: a[_f] for _f in add_feature_names} if add_feature_names is not None else None
+# if use_dask:
+a_done = dask.compute(a_preprocessed)[0]
+# else:
+#     a_done = a_preprocessed
 
-# Check for -max_value
-# for key_i in a.fields:
-#     # print(key_i)
-#     tmp=dask.compute(a[key_i])
-#     try: 
-#         tmp_=np.sum(np.isfinite(np.cosh(tmp)))
-#         tmp__=80480-tmp_
-#         if tmp_ != 80480 and tmp_ != 0:
-#             print(f"Missing values in {key_i}: {tmp__}")
-#     except:
-#         pass
+for p_type in a_preprocessed.keys():
+    for f_name in a_preprocessed[p_type].keys():
+        print(f"{p_type}_{f_name}", ak.all(is_finite(a_done[p_type][f_name])))
+# print(a_done)
 
-# a_done = dask.compute(a_preprocessed)
-
-print("Done") #a_done)
+print("Done")
