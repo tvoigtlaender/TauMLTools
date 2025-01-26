@@ -1,12 +1,14 @@
 import dask
+from dask.delayed import delayed
 import numpy as np
 import awkward as ak
 import uproot
 import yaml
+from sklearn.preprocessing import StandardScaler
 
 # np.seterr("raise")
 
-# path_DY = "root://eoscms.cern.ch//eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1.root"
+path_DY = "root://eoscms.cern.ch//eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1.root"
 path_SuM = "root://eosuser.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_0.root"
 
 cfg_path = "/work/tvoigtlaender/TauTransformerComparison/dataloader_dev/TauMLTools/cfg.yaml"
@@ -14,9 +16,6 @@ cfg_path = "/work/tvoigtlaender/TauTransformerComparison/dataloader_dev/TauMLToo
 with open(cfg_path, 'r') as stream:
     feature_names = yaml.safe_load(stream)['feature_names']
 
-use_dask = True
-
-# if use_dask:
 a = uproot.dask(f"{path_SuM}:taus",step_size="1 GB", timeout=3000)
     
 # else:
@@ -36,7 +35,7 @@ def get_type(col):
     else:
         raise ValueError(f"Unsupported dimension: {col.ndim}")
 
-def is_finite(col, dask_array=True):
+def is_finite(col):
     # Get the min and max values for the given column
     primitive_type_col = get_type(col)
     if np.issubdtype(primitive_type_col, np.integer):
@@ -48,7 +47,7 @@ def is_finite(col, dask_array=True):
     else:
         raise TypeError(f"Unsupported DataType: {primitive_type_col}")
     # Check if the values are infinite 
-    return np.isfinite(col) & (col!=min_value) & (col!=max_value)
+    return ~np.isnan(col) & np.isfinite(col) & (col!=min_value) & (col!=max_value)
 
 def has_values(col):
     # Check 
@@ -86,26 +85,26 @@ for feature_type, feature_list in feature_names.items():
 a_preprocessed['global']['tau_E_over_pt'] = np.sqrt((a['tau_pt']*np.cosh(a['tau_eta']))*(a['tau_pt']*np.cosh(a['tau_eta'])) + a['tau_mass']*a['tau_mass'])/a['tau_pt']
 a_preprocessed['global']['tau_n_charged_prongs'] = a['tau_decayMode']//5 + 1
 a_preprocessed['global']['tau_n_neutral_prongs'] = a['tau_decayMode']%5
-a_preprocessed['global']['tau_chargedIsoPtSumdR03_over_dR05'] = ak.where((a['tau_chargedIsoPtSum']!=0), (a['tau_chargedIsoPtSumdR03']/a['tau_chargedIsoPtSum']), 0)
-a_preprocessed['global']['tau_neutralIsoPtSumWeight_over_neutralIsoPtSum'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumWeight']/a['tau_neutralIsoPtSum']), 0)
-a_preprocessed['global']['tau_neutralIsoPtSumWeightdR03_over_neutralIsoPtSum'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumWeightdR03']/a['tau_neutralIsoPtSum']), 0)
-a_preprocessed['global']['tau_neutralIsoPtSumdR03_over_dR05'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumdR03']/a['tau_neutralIsoPtSum']), 0)
+a_preprocessed['global']['tau_chargedIsoPtSumdR03_over_dR05'] = ak.where((a['tau_chargedIsoPtSum']!=0), (a['tau_chargedIsoPtSumdR03']/a['tau_chargedIsoPtSum']), np.nan)
+a_preprocessed['global']['tau_neutralIsoPtSumWeight_over_neutralIsoPtSum'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumWeight']/a['tau_neutralIsoPtSum']), np.nan)
+a_preprocessed['global']['tau_neutralIsoPtSumWeightdR03_over_neutralIsoPtSum'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumWeightdR03']/a['tau_neutralIsoPtSum']), np.nan)
+a_preprocessed['global']['tau_neutralIsoPtSumdR03_over_dR05'] = ak.where((a['tau_neutralIsoPtSum']!=0), (a['tau_neutralIsoPtSumdR03']/a['tau_neutralIsoPtSum']), np.nan)
 
 tau_dxy_valid = (is_finite(a['tau_dxy']) & (a['tau_dxy'] > -10) & is_finite(a['tau_dxy_error']) & (a['tau_dxy_error'] > 0)) #Used
 a_preprocessed['global']['tau_dxy_valid'] = ak.values_astype(tau_dxy_valid, np.float32)
-a_preprocessed['global']['tau_dxy'] = ak.where(tau_dxy_valid, (a['tau_dxy']), 0)
-a_preprocessed['global']['tau_dxy_sig'] = ak.where(tau_dxy_valid, (np.abs(a['tau_dxy'])/a['tau_dxy_error']), 0)
+a_preprocessed['global']['tau_dxy'] = ak.where(tau_dxy_valid, (a['tau_dxy']), np.nan)
+a_preprocessed['global']['tau_dxy_sig'] = ak.where(tau_dxy_valid, (np.abs(a['tau_dxy'])/a['tau_dxy_error']), np.nan)
 
 a_preprocessed['global']['tau_ip3d_sig'] = np.abs(a['tau_ip3d'])/a['tau_ip3d_error']
 
 tau_dz_sig_valid = (is_finite(a['tau_dz']) & is_finite(a['tau_dz_error']) & (a['tau_dz_error'] > 0)) #Used
 a_preprocessed['global']['tau_dz_sig_valid'] = ak.values_astype(tau_dz_sig_valid, np.float32)
-# a_preprocessed['global']['tau_dz'] = ak.where(tau_dz_sig_valid, (a['tau_dz']), 0)
-a_preprocessed['global']['tau_dz_sig'] = ak.where(tau_dz_sig_valid, (np.abs(a['tau_dz'])/a['tau_dz_error']), 0)
+# a_preprocessed['global']['tau_dz'] = ak.where(tau_dz_sig_valid, (a['tau_dz']), np.nan)
+a_preprocessed['global']['tau_dz_sig'] = ak.where(tau_dz_sig_valid, (np.abs(a['tau_dz'])/a['tau_dz_error']), np.nan)
 
 tau_gj_angle_diff_valid = (a['tau_gj_angle_diff'] >= 0) # Used
 a_preprocessed['global']['tau_gj_angle_diff_valid'] = ak.values_astype(tau_gj_angle_diff_valid, np.float32)
-a_preprocessed['global']['tau_gj_angle_diff'] = ak.where(tau_gj_angle_diff_valid, (a['tau_gj_angle_diff']), 0)
+a_preprocessed['global']['tau_gj_angle_diff'] = ak.where(tau_gj_angle_diff_valid, (a['tau_gj_angle_diff']), np.nan)
 
 a_preprocessed['global']['tau_leadChargedCand_etaAtEcalEntrance_minus_tau_eta'] = a['tau_leadChargedCand_etaAtEcalEntrance'] - a['tau_eta']
 a_preprocessed['global']['particle_type'] = 9*ak.ones_like(a['tau_pt']) # assign unique particle type to a "global" token 
@@ -125,25 +124,25 @@ a_preprocessed['pfCand']['r'] = np.sqrt(np.square(pf_deta) + np.square(pf_dphi))
 a_preprocessed['pfCand']['theta'] = np.arctan2(pf_dphi, pf_deta) # dphi -> y, deta -> x
 a_preprocessed['pfCand']['particle_type'] = a['pfCand_particleType'] - 1
 
-vertex_z_valid = is_finite(a['pfCand_vertex_z']) #Used
+vertex_z_valid = is_finite(a['pfCand_vertex_z']) #Used missing flag
 a_preprocessed['pfCand']['vertex_dx'] = a['pfCand_vertex_x'] - a['pv_x']
 a_preprocessed['pfCand']['vertex_dy'] = a['pfCand_vertex_y'] - a['pv_y']
-a_preprocessed['pfCand']['vertex_dz'] = ak.where(vertex_z_valid, (a['pfCand_vertex_z'] - a['pv_z']), 0)
+a_preprocessed['pfCand']['vertex_dz'] = ak.where(vertex_z_valid, (a['pfCand_vertex_z'] - a['pv_z']), np.nan)
 a_preprocessed['pfCand']['vertex_dx_tauFL'] = a['pfCand_vertex_x'] - a['pv_x'] - a['tau_flightLength_x']
 a_preprocessed['pfCand']['vertex_dy_tauFL'] = a['pfCand_vertex_y'] - a['pv_y'] - a['tau_flightLength_y']
-a_preprocessed['pfCand']['vertex_dz_tauFL'] = ak.where(vertex_z_valid, (a['pfCand_vertex_z'] - a['pv_z'] - a['tau_flightLength_z']), 0)
+a_preprocessed['pfCand']['vertex_dz_tauFL'] = ak.where(vertex_z_valid, (a['pfCand_vertex_z'] - a['pv_z'] - a['tau_flightLength_z']), np.nan)
 
 has_track_details = (a['pfCand_hasTrackDetails'] == 1)
 has_track_details_track_ndof = has_track_details * (a['pfCand_track_ndof'] > 0) # Used
 has_track_details_dxy_sig_finite = has_track_details * (is_finite(a['pfCand_dxy']) & is_finite(a['pfCand_dxy_error'])) #Used
 has_track_details_dz_sig_finite = has_track_details * (is_finite(a['pfCand_dz']) & is_finite(a['pfCand_dz_error'])) #Used
 a_preprocessed['pfCand']['dxy_sig_valid'] = ak.values_astype(has_track_details_dxy_sig_finite, np.float32)
-a_preprocessed['pfCand']['dxy_sig'] = ak.where(has_track_details_dxy_sig_finite, (np.abs(a['pfCand_dxy'])/a['pfCand_dxy_error']), 0)
+a_preprocessed['pfCand']['dxy_sig'] = ak.where(has_track_details_dxy_sig_finite, (np.abs(a['pfCand_dxy'])/a['pfCand_dxy_error']), np.nan)
 a_preprocessed['pfCand']['dz_sig_valid'] = ak.values_astype(has_track_details_dz_sig_finite, np.float32)
-a_preprocessed['pfCand']['dz_sig'] = ak.where(has_track_details_dz_sig_finite, (np.abs(a['pfCand_dz'])/a['pfCand_dz_error']), 0)
+a_preprocessed['pfCand']['dz_sig'] = ak.where(has_track_details_dz_sig_finite, (np.abs(a['pfCand_dz'])/a['pfCand_dz_error']), np.nan)
 a_preprocessed['pfCand']['track_ndof_valid'] = ak.values_astype(has_track_details_track_ndof, np.float32)
-a_preprocessed['pfCand']['track_ndof'] = ak.where(has_track_details_track_ndof, a['pfCand_track_ndof'], 0)
-a_preprocessed['pfCand']['chi2_ndof'] = ak.where(has_track_details_track_ndof, (a['pfCand_track_chi2']/a['pfCand_track_ndof']), 0)
+a_preprocessed['pfCand']['track_ndof'] = ak.where(has_track_details_track_ndof, a['pfCand_track_ndof'], np.nan)
+a_preprocessed['pfCand']['chi2_ndof'] = ak.where(has_track_details_track_ndof, (a['pfCand_track_chi2']/a['pfCand_track_ndof']), np.nan)
 
 # ------- Electrons ------- #
 
@@ -162,9 +161,9 @@ a_preprocessed['ele']['particle_type'] = 7*ak.ones_like(a['ele_pt']) # assuming 
 
 ele_cc_valid = (a['ele_cc_ele_energy'] >= 0) #Used
 a_preprocessed['ele']['cc_valid'] = ak.values_astype(ele_cc_valid, np.float32)
-a_preprocessed['ele']['cc_ele_rel_energy'] = ak.where(ele_cc_valid, (a['ele_cc_ele_energy']/a['ele_pt']), 0)
-a_preprocessed['ele']['cc_gamma_rel_energy'] = ak.where(ele_cc_valid, (a['ele_cc_gamma_energy']/a['ele_cc_ele_energy']), 0)
-a_preprocessed['ele']['cc_n_gamma'] = ak.where(ele_cc_valid, a['ele_cc_n_gamma'], 0)
+a_preprocessed['ele']['cc_ele_rel_energy'] = ak.where(ele_cc_valid, (a['ele_cc_ele_energy']/a['ele_pt']), np.nan)
+a_preprocessed['ele']['cc_gamma_rel_energy'] = ak.where(ele_cc_valid, (a['ele_cc_gamma_energy']/a['ele_cc_ele_energy']), np.nan)
+a_preprocessed['ele']['cc_n_gamma'] = ak.where(ele_cc_valid, a['ele_cc_n_gamma'], np.nan)
 a_preprocessed['ele']['rel_trackMomentumAtVtx'] = a['ele_trackMomentumAtVtx']/a['ele_pt']
 a_preprocessed['ele']['rel_trackMomentumAtCalo'] = a['ele_trackMomentumAtCalo']/a['ele_pt']
 a_preprocessed['ele']['rel_trackMomentumOut'] = a['ele_trackMomentumOut']/a['ele_pt']
@@ -177,14 +176,14 @@ a_preprocessed['ele']['gsfTrack_pt_sig'] = a['ele_gsfTrack_pt']/a['ele_gsfTrack_
 
 ele_has_closestCtfTrack = (a['ele_closestCtfTrack_normalizedChi2'] >= 0) #Used
 a_preprocessed['ele']['has_closestCtfTrack'] = ak.values_astype(ele_has_closestCtfTrack, np.float32)
-a_preprocessed['ele']['closestCtfTrack_normalizedChi2'] = ak.where(ele_has_closestCtfTrack, a['ele_closestCtfTrack_normalizedChi2'], 0)
-a_preprocessed['ele']['closestCtfTrack_numberOfValidHits'] = ak.where(ele_has_closestCtfTrack, a['ele_closestCtfTrack_numberOfValidHits'], 0)
+a_preprocessed['ele']['closestCtfTrack_normalizedChi2'] = ak.where(ele_has_closestCtfTrack, a['ele_closestCtfTrack_normalizedChi2'], np.nan)
+a_preprocessed['ele']['closestCtfTrack_numberOfValidHits'] = ak.where(ele_has_closestCtfTrack, a['ele_closestCtfTrack_numberOfValidHits'], np.nan)
 
 ele_mva_valid = is_finite(a['ele_e5x5']) #Used
 ele_features = ['sigmaEtaEta', 'sigmaIetaIeta', 'sigmaIphiIphi', 'sigmaIetaIphi', 'e1x5', 'e2x5Max', 'e5x5', 'r9', 'hcalDepth1OverEcal', 'hcalDepth2OverEcal', 'hcalDepth1OverEcalBc', 'hcalDepth2OverEcalBc','eLeft', 'eRight', 'eBottom', 'eTop','full5x5_sigmaEtaEta', 'full5x5_sigmaIetaIeta', 'full5x5_sigmaIphiIphi', 'full5x5_sigmaIetaIphi','full5x5_e1x5', 'full5x5_e2x5Max', 'full5x5_e5x5', 'full5x5_r9','full5x5_hcalDepth1OverEcal', 'full5x5_hcalDepth2OverEcal', 'full5x5_hcalDepth1OverEcalBc', 'full5x5_hcalDepth2OverEcalBc','full5x5_eLeft', 'full5x5_eRight', 'full5x5_eBottom', 'full5x5_eTop','full5x5_e2x5Left', 'full5x5_e2x5Right', 'full5x5_e2x5Bottom', 'full5x5_e2x5Top']
 a_preprocessed['ele']['mva_valid'] = ak.values_astype(ele_mva_valid, np.float32)
 for ele_feature in ele_features:
-    a_preprocessed['ele'][ele_feature] = ak.where(ele_mva_valid, a[f'ele_{ele_feature}'], 0)
+    a_preprocessed['ele'][ele_feature] = ak.where(ele_mva_valid, a[f'ele_{ele_feature}'], np.nan)
 
 # ------- Muons ------- #
 
@@ -205,16 +204,79 @@ a_preprocessed['muon']['dxy_sig'] = np.abs(a['muon_dxy'])/a['muon_dxy_error']
 
 muon_normalizedChi2_valid = ((a['muon_normalizedChi2'] > 0) * is_finite(a['muon_normalizedChi2'])) #Used
 a_preprocessed['muon']['normalizedChi2_valid'] = ak.values_astype(muon_normalizedChi2_valid, np.float32)
-a_preprocessed['muon']['normalizedChi2'] = ak.where(muon_normalizedChi2_valid, a['muon_normalizedChi2'], 0)
-a_preprocessed['muon']['numberOfValidHits'] = ak.where(muon_normalizedChi2_valid, a['muon_numberOfValidHits'], 0)
+a_preprocessed['muon']['normalizedChi2'] = ak.where(muon_normalizedChi2_valid, a['muon_normalizedChi2'], np.nan)
+a_preprocessed['muon']['numberOfValidHits'] = ak.where(muon_normalizedChi2_valid, a['muon_numberOfValidHits'], np.nan)
 
 a_preprocessed['muon']['rel_pfEcalEnergy'] = a['muon_pfEcalEnergy']/a['muon_pt']
 
 # add_columns = {_f: a[_f] for _f in add_feature_names} if add_feature_names is not None else None
-# if use_dask:
+
 a_done = dask.compute(a_preprocessed)[0]
-# else:
-#     a_done = a_preprocessed
+
+def process_feature(feature_data, feature_name):
+    column = feature_data[feature_name]
+    # Flatten the column if it is 2D
+    if column.ndim == 2:
+        column = ak.flatten(column)
+    # Get the mean, std and non-NaN count of the column
+    mean = ak.nanmean(column)
+    std = ak.nanstd(column)
+    min_ = ak.nanmin(column)
+    max_ = ak.nanmax(column)
+    count = ak.sum(is_finite(column))
+    # Replace NaN values with 0
+    feature_data[feature_name] = ak.nan_to_num(feature_data[feature_name], nan=0)
+    return {
+        "mean": mean,
+        "std": std,
+        "min": min_,
+        "max": max_,
+        "count": count,
+    }
+
+# Initialize scaling data dictionary
+scaling_data = {feature_type: {} for feature_type in feature_names.keys()}
+
+# Create delayed computations
+delayed_computations = []
+for feature_type in feature_names.keys():
+    for feature_name in feature_names[feature_type]:
+        delayed_result = delayed(process_feature)(a_done[feature_type], feature_name)
+        delayed_computations.append((feature_type, feature_name, delayed_result))
+
+# Compute all operations in parallel
+results = dask.compute(*[dc[2] for dc in delayed_computations])
+
+# Update scaling_data with results
+for (feature_type, feature_name, _), result in zip(delayed_computations, results):
+    scaling_data[feature_type][feature_name] = result
+
+# scalers = {}
+# for feature_type in feature_names.keys():
+#     scalers[feature_type] = StandardScaler()
+
+# Initialize scalers using precomputed statistics
+scalers = {}
+for feature_type in feature_names.keys():
+    # Get all features for this type
+    features = feature_names[feature_type]
+    
+    # Extract means and stds for all features of this type
+    means = np.array([scaling_data[feature_type][feat]['mean'] for feat in features])
+    stds = np.array([scaling_data[feature_type][feat]['std'] for feat in features])
+    
+    # Initialize scaler
+    scaler = StandardScaler(with_mean=True, with_std=True)
+    
+    # Set precomputed values
+    scaler.mean_ = means
+    scaler.scale_ = stds
+    scaler.var_ = stds ** 2
+    scaler.n_samples_seen_ = sum(scaling_data[feature_type][feat]['count'] for feat in features)
+    
+    scalers[feature_type] = scaler
+
+
 
 for p_type in a_done.keys():
     for f_name in a_done[p_type].keys():

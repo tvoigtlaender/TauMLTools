@@ -74,6 +74,15 @@ for feature_type, feature_list in feature_names.items():
         except:
             print(f'        {f} not found in input ROOT file, will skip it') 
 
+
+a_done = dask.compute(a_preprocessed)[0]
+
+for p_type in a_done.keys():
+    for f_name in a_done[p_type].keys():
+        print(f"{p_type}_{f_name}", ak.all(is_finite(a_done[p_type][f_name])))
+
+exit(0)
+
 a_preprocessed['global']['tau_E_over_pt'] = np.sqrt((a['tau_pt']*np.cosh(a['tau_eta']))*(a['tau_pt']*np.cosh(a['tau_eta'])) + a['tau_mass']*a['tau_mass'])/a['tau_pt']
 a_preprocessed['global']['tau_n_charged_prongs'] = a['tau_decayMode']//5 + 1
 a_preprocessed['global']['tau_n_neutral_prongs'] = a['tau_decayMode']%5
@@ -207,8 +216,8 @@ a_done = dask.compute(a_preprocessed)[0]
 # else:
 #     a_done = a_preprocessed
 
-for p_type in a_preprocessed.keys():
-    for f_name in a_preprocessed[p_type].keys():
+for p_type in a_done.keys():
+    for f_name in a_done[p_type].keys():
         print(f"{p_type}_{f_name}", ak.all(is_finite(a_done[p_type][f_name])))
 # print(a_done)
 

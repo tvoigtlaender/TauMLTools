@@ -1,7 +1,7 @@
 import os
 import time
 import shutil
-import gc
+# import gc
 from glob import glob
 from collections import defaultdict
 
@@ -42,8 +42,8 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
             print(f'\n        Loading: took {(time_1-time_0):.1f} s.')
 
         # preprocess awkward array
-        a_preprocessed, label_data, gen_data, add_columns = preprocess_array(a, feature_names, dataset_cfg['add_columns'], cfg['verbose'])
-        del a; gc.collect()
+        a_preprocessed, scaling_data, label_data, gen_data, add_columns = preprocess_array(a, feature_names, dataset_cfg['add_columns'], cfg['verbose'])
+        # del a; gc.collect()
 
         # preprocess labels
         if dataset_cfg['recompute_tau_type']:
@@ -63,7 +63,7 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
             is_ragged = feature_type != 'global'
             X = awkward_to_tf(a_preprocessed[feature_type], feature_list, is_ragged) # will keep only feats from feature_list
             data.append(X)
-            del a_preprocessed[feature_type], X; gc.collect()
+            # del a_preprocessed[feature_type], X; gc.collect()
 
         # add one-hot encoded labels
         label_columns = []
@@ -75,7 +75,7 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
             label_columns.append(f'label_{tau_type}')
         labels = tf.stack(labels, axis=-1)
         data.append(labels)
-        del labels, label_data; gc.collect()
+        # del labels, label_data; gc.collect()
 
         # save label names to the yaml cfg
         with open_dict(cfg):
@@ -85,7 +85,7 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
         if add_columns is not None:
             add_columns = awkward_to_tf(add_columns, dataset_cfg['add_columns'], False)
             data.append(add_columns)
-            del add_columns; gc.collect()
+            # del add_columns; gc.collect()
 
         # create TF dataset
         dataset = tf.data.Dataset.from_tensor_slices(tuple(data))
@@ -106,7 +106,7 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
         time_4 = time.time()
         if cfg['verbose']:
             print(f'        Saving TF datasets: took {(time_4-time_3):.1f} s.\n')
-        del dataset, data; gc.collect()
+        # del dataset, data; gc.collect()
     return True
 
 @hydra.main(config_path='configs', config_name='create_dataset')
