@@ -17,5 +17,6 @@ __init__.py
 .conda
 /.law
 /data
+!/Preprocessing/root2tf/configs/data
 /.crabOverseer
 /Evaluation/outputs
