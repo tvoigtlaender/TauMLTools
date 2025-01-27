@@ -1,0 +1,320 @@
+tree_name: taus
+input_branches: [
+                  ### global
+                  'rho', 'tauType', 'tau_pt', 'tau_eta', 'tau_phi', 'tau_mass', 'tau_decayMode', 'tau_decayModeFinding', 'tau_charge',
+                  'tau_chargedIsoPtSum', 'tau_chargedIsoPtSumdR03', 'tau_footprintCorrection', 'tau_neutralIsoPtSum',
+                  'tau_neutralIsoPtSumWeight', 'tau_neutralIsoPtSumWeightdR03',
+                  'tau_neutralIsoPtSumdR03', 'tau_photonPtSumOutsideSignalCone', 'tau_puCorrPtSum',
+                  'pv_x', 'pv_y', 'pv_z', 
+                  'tau_hasSecondaryVertex', 
+                  'tau_dxy', 'tau_dxy_error', 'tau_ip3d', 'tau_ip3d_error', 'tau_dz', 'tau_dz_error',
+                  'tau_flightLength_x', 'tau_flightLength_y', 'tau_flightLength_z', 'tau_flightLength_sig',
+                  'tau_pt_weighted_deta_strip', 'tau_pt_weighted_dphi_strip', 'tau_pt_weighted_dr_signal', 'tau_pt_weighted_dr_iso',
+                  'tau_leadingTrackNormChi2', 'tau_e_ratio', 'tau_gj_angle_diff',
+                  'tau_n_photons', 'tau_emFraction', 'tau_inside_ecal_crack',
+                  'tau_leadChargedCand_etaAtEcalEntrance',
+                  'tau_byDeepTau2017v2p1VSjetraw', 'tau_byDeepTau2017v2p1VSmuraw', 'tau_byDeepTau2017v2p1VSeraw', 
+                  ### gen level
+                  'sampleType', 'genLepton_index', 'genJet_index', 'genLepton_kind', 'genLepton_vis_pt', 'genLepton_vis_eta', 'genLepton_vis_phi', 
+                  ### PF candidates
+                  'pfCand_pt', 'pfCand_eta', 'pfCand_phi', 'pfCand_particleType',
+                  'pfCand_vertex_x', 'pfCand_vertex_y', 'pfCand_vertex_z',
+                  'pfCand_charge', 'pfCand_pvAssociationQuality', 'pfCand_puppiWeight', 
+                  'pfCand_lostInnerHits', 'pfCand_nPixelHits', 'pfCand_hasTrackDetails',
+                  'pfCand_dxy', 'pfCand_dxy_error', 'pfCand_dz', 'pfCand_dz_error',
+                  'pfCand_track_chi2', 'pfCand_track_ndof',
+                  'pfCand_fromPV', 'pfCand_tauLeadChargedHadrCand',
+                  'pfCand_hcalFraction', 'pfCand_rawCaloFraction', 'pfCand_rawHcalFraction', 
+                  'pfCand_nHits', 'pfCand_nPixelLayers', 'pfCand_nStripLayers',
+                  ### PAT electron
+                  'ele_pt', 'ele_eta', 'ele_phi', 'ele_cc_ele_energy', 'ele_cc_gamma_energy', 'ele_cc_n_gamma', 
+                  'ele_trackMomentumAtVtx', 'ele_trackMomentumAtCalo', 'ele_trackMomentumOut',
+                  'ele_trackMomentumAtEleClus', 'ele_trackMomentumAtVtxWithConstraint', 
+                  'ele_ecalEnergy', 'ele_ecalEnergy_error', 
+                  'ele_eSuperClusterOverP', 'ele_eSeedClusterOverP', 'ele_eSeedClusterOverPout', 'ele_eEleClusterOverPout',
+                  'ele_deltaEtaSuperClusterTrackAtVtx', 'ele_deltaEtaSeedClusterTrackAtCalo', 'ele_deltaEtaEleClusterTrackAtCalo',
+                  'ele_deltaPhiEleClusterTrackAtCalo', 'ele_deltaPhiSuperClusterTrackAtVtx', 'ele_deltaPhiSeedClusterTrackAtCalo',
+                  'ele_mvaInput_earlyBrem', 'ele_mvaInput_lateBrem', 'ele_mvaInput_sigmaEtaEta', 'ele_mvaInput_hadEnergy', 'ele_mvaInput_deltaEta',
+                  'ele_gsfTrack_normalizedChi2', 'ele_gsfTrack_numberOfValidHits',
+                  'ele_gsfTrack_pt', 'ele_gsfTrack_pt_error', 
+                  'ele_closestCtfTrack_normalizedChi2', 'ele_closestCtfTrack_numberOfValidHits',
+                  'ele_sigmaEtaEta', 'ele_sigmaIetaIeta', 'ele_sigmaIphiIphi', 'ele_sigmaIetaIphi',
+                  'ele_e1x5', 'ele_e2x5Max', 'ele_e5x5', 'ele_r9', 
+                  'ele_hcalDepth1OverEcal', 'ele_hcalDepth2OverEcal', 'ele_hcalDepth1OverEcalBc', 'ele_hcalDepth2OverEcalBc',
+                  'ele_eLeft', 'ele_eRight', 'ele_eBottom', 'ele_eTop',
+                  'ele_full5x5_sigmaEtaEta', 'ele_full5x5_sigmaIetaIeta', 'ele_full5x5_sigmaIphiIphi', 'ele_full5x5_sigmaIetaIphi',
+                  'ele_full5x5_e1x5', 'ele_full5x5_e2x5Max', 'ele_full5x5_e5x5', 'ele_full5x5_r9',
+                  'ele_full5x5_hcalDepth1OverEcal', 'ele_full5x5_hcalDepth2OverEcal', 'ele_full5x5_hcalDepth1OverEcalBc', 'ele_full5x5_hcalDepth2OverEcalBc',
+                  'ele_full5x5_eLeft', 'ele_full5x5_eRight', 'ele_full5x5_eBottom', 'ele_full5x5_eTop',
+                  'ele_full5x5_e2x5Left', 'ele_full5x5_e2x5Right', 'ele_full5x5_e2x5Bottom', 'ele_full5x5_e2x5Top',
+                  ### PAT muon
+                  'muon_pt', 'muon_eta', 'muon_phi', 'muon_dxy', 'muon_dxy_error', 'muon_pfEcalEnergy', 
+                  'muon_normalizedChi2', 'muon_numberOfValidHits', 'muon_segmentCompatibility', 'muon_caloCompatibility',
+                  'muon_n_matches_DT_1', 'muon_n_matches_DT_2', 'muon_n_matches_DT_3', 'muon_n_matches_DT_4',
+                  'muon_n_matches_CSC_1', 'muon_n_matches_CSC_2', 'muon_n_matches_CSC_3', 'muon_n_matches_CSC_4',
+                  'muon_n_matches_RPC_1', 'muon_n_matches_RPC_2', 'muon_n_matches_RPC_3', 'muon_n_matches_RPC_4',  
+                  'muon_n_hits_DT_1', 'muon_n_hits_DT_2', 'muon_n_hits_DT_3', 'muon_n_hits_DT_4', 
+                  'muon_n_hits_CSC_1', 'muon_n_hits_CSC_2', 'muon_n_hits_CSC_3', 'muon_n_hits_CSC_4', 
+                  'muon_n_hits_RPC_1', 'muon_n_hits_RPC_2', 'muon_n_hits_RPC_3', 'muon_n_hits_RPC_4'
+
+                ]
+
+input_data: # "sample_alias": [list of strings with tau types to be selected]
+#   train:
+#     recompute_tau_type: False
+#     add_columns: null
+#     files:
+    
+#       "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_100.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_101.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_102.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_103.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_104.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_105.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_106.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_107.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_108.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_109.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_110.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_111.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_112.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_113.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_114.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_115.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_116.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_117.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_118.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_119.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_120.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_121.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_122.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_123.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_124.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_125.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_126.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_127.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_128.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_129.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_130.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_131.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_132.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_133.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_134.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_135.root": ["tau", "e", "mu", "jet"]
+#       # "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_136.root": ["tau", "e", "mu", "jet"] # absent in "data" folder
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_137.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_138.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_139.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_140.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_141.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_142.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_143.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_144.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_145.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_146.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_147.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_148.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_149.root": ["tau", "e", "mu", "jet"]
+  
+#   val:
+#     recompute_tau_type: False
+#     add_columns: null
+#     files: 
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_495.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_496.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_497.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_498.root": ["tau", "e", "mu", "jet"]
+#       "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_499.root": ["tau", "e", "mu", "jet"]
+  
+  test:
+    recompute_tau_type: True
+    add_columns:  # will return them in this order; set to null to skip returning
+      - tau_byDeepTau2017v2p1VSeraw
+      - tau_byDeepTau2017v2p1VSmuraw
+      - tau_byDeepTau2017v2p1VSjetraw
+      - tau_pt
+      - tau_eta
+      - tau_decayMode
+      - tau_dz
+    files:
+      # "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_490.root": ["tau", "e", "mu", "jet"]
+      # "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_491.root": ["tau", "e", "mu", "jet"]
+      # "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_492.root": ["tau", "e", "mu", "jet"]
+      # "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_493.root": ["tau", "e", "mu", "jet"]
+      # "../data/ShuffleMergeSpectral_trainingSamples-2_rerun/ShuffleMergeSpectral_494.root": ["tau", "e", "mu", "jet"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-1.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-10.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-2.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-3.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-4.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-5.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-6.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-7.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-8.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_1-9.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_10.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_11.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_12.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_13.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_14.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_20.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_21.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_22.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_23.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_24.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_25.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_26.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_27.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_28.root": ["tau"]
+      "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_29.root": ["tau"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1000.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1001.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1002.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1003.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1004.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1005.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1006.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1007.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1008.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1009.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1010.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1011.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1012.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1013.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1014.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-1015.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-120.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-121.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-122.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-123.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-124.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-125.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-126.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-127.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-128.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-129.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_1-130.root": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/TTToSemiLeptonic/eventTuple_*": ["jet"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/GluGluHToTauTau_M125/eventTuple_*": ["tau"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_*": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_10.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_100.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1000.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1001.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1002.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1003.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1004.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1005.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1006.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1007.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1008.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1009.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_101.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1010.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1011.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1012.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1013.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1014.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1015.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1016.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1017.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1018.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1019.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_102.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1020.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1021.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1022.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1023.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1024.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1025.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1026.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1027.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1028.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1029.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_103.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1030.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1031.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1032.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1033.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1034.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1035.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1036.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1037.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1038.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1039.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_104.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1040.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1041.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1042.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1043.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1044.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1045.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1046.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1047.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1048.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1049.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_105.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1050.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1051.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1052.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1053.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1054.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1055.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1056.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1057.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1058.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1059.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_106.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1060.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1061.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1062.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1063.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1064.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1065.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1066.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1067.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1068.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1069.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_107.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1070.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1071.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1072.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1073.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1074.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1075.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1076.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1077.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1078.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1079.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_108.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1080.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1081.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1082.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1083.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1084.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1085.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1086.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1087.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1088.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1089.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_109.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1090.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1091.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1092.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1093.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1094.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1095.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1096.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1097.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1098.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_1099.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_11.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_12.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_13.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_14.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_15.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_16.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_17.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_18.root": ["e", "mu"]
+      # "root://eoscms.cern.ch///eos/cms/store/group/phys_tau/TauML/prod_2018_v2/full_tuples/DYJetsToLL_M-50-amcatnloFXFX_ext2/eventTuple_19.root": ["e", "mu"]
+

@@ -16,7 +16,6 @@ __init__.py
 .vscode
 .conda
 /.law
-/data
-!/Preprocessing/root2tf/configs/data
+#/data
 /.crabOverseer
 /Evaluation/outputs
