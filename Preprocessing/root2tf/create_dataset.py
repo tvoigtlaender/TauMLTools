@@ -15,12 +15,6 @@ from utils.remote_glob import remote_glob
 import awkward as ak
 import numpy as np
 
-def fetch_file_list(_files):
-    files = []
-    for _entry, tau_types in _files.items():
-            files += [(path , tau_types) for path in remote_glob(_entry)]
-    return sorted(files)
-
 def process_files(files, cfg, dataset_type, dataset_cfg):
     import tensorflow as tf
     from utils.data_preprocessing import load_from_file, preprocess_array, awkward_to_tf, compute_labels
@@ -42,12 +36,12 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
             print(f'\n        Loading: took {(time_1-time_0):.1f} s.')
 
         # preprocess awkward array
-        a_preprocessed, scaling_data, label_data, gen_data, add_columns = preprocess_array(a, feature_names, dataset_cfg['add_columns'], cfg['verbose'])
+        a_preprocessed, scaling_data, label_data, gen_data, add_columns = preprocess_array(a, feature_names, dataset_cfg.get('add_columns'), cfg.get('verbose'))
         # del a; gc.collect()
 
         # preprocess labels
-        if dataset_cfg['recompute_tau_type']:
-            _labels = compute_labels(cfg['gen_cfg'], gen_data, label_data)
+        if dataset_cfg.get('recompute_tau_type'):
+            _labels = compute_labels(cfg['gen_cfg'], gen_data, label_data) # TODO
         else:
             _labels = label_data['tauType']
 
@@ -120,7 +114,9 @@ def main(cfg: DictConfig) -> None:
         # create list of file names to open
         dataset_cfg = input_data[dataset_type]
         _files = dataset_cfg.pop('files')
-        files = fetch_file_list(_files)
+        files = []
+        for file_path in _files:
+            files += remote_glob(file_path)
 
         process_files(files=files, cfg=cfg, dataset_type=dataset_type, dataset_cfg=dataset_cfg)
 

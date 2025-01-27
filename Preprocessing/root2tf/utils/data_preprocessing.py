@@ -38,30 +38,31 @@ def is_finite(col, dask_array=True):
     return ~np.isnan(col) & np.isfinite(col) & (col!=min_value) & (col!=max_value)
 
 
-def process_feature(feature_data, feature_name):
-    column = feature_data[feature_name]
+def process_feature(col):
+    collumn = col
     # Flatten the column if it is 2D
-    if column.ndim == 2:
-        column = ak.flatten(column)
+    if collumn.ndim == 2:
+        collumn = ak.flatten(collumn)
     # Get the mean, std and non-NaN count of the column
-    mean = ak.nanmean(column)
-    std = ak.nanstd(column)
-    min_ = ak.nanmin(column)
-    max_ = ak.nanmax(column)
-    count = ak.sum(is_finite(column))
+    mean = ak.nanmean(collumn)
+    std = ak.nanstd(collumn)
+    min_ = ak.nanmin(collumn)
+    max_ = ak.nanmax(collumn)
+    count = ak.sum(is_finite(collumn))
     # Replace NaN values with 0
-    feature_data[feature_name] = ak.nan_to_num(feature_data[feature_name], nan=0)
-    return {
+    no_nan_feature = ak.nan_to_num(col, nan=0)
+    scaler_dict = {
         "mean": mean,
         "std": std,
         "min": min_,
         "max": max_,
         "count": count,
     }
+    return no_nan_feature, scaler_dict
 
 def load_from_file(file_name, tree_name, step_size):
     print(f'      - {file_name}')
-    a = uproot.dask(f'{file_name}:{tree_name}', step_size=step_size, library='ak', timeout=300)
+    a = uproot.dask(f'{file_name}:{tree_name}', step_size=step_size, library='ak', timeout=3000)
     return a
 
 def awkward_to_tf(a, feature_names, is_ragged):
@@ -71,15 +72,14 @@ def awkward_to_tf(a, feature_names, is_ragged):
     tf_array = []
     for feature_name in feature_names:
         _a = a[feature_name]
-        finally:
-            assert not np.any(np.isnan(_a)), f'Found NaN in {feature_name}'
-            assert np.all(np.isfinite(_a)), f'Found not finite value in {feature_name}'
-            if is_ragged:
-                _a = ak.flatten(_a)
-                _a = ak.values_astype(_a, np.float32)
-                _a = tf.RaggedTensor.from_row_lengths(_a, type_lengths)
-            tf_array.append(_a)
-            # del _a, a[feature_name]; gc.collect()
+        assert not np.any(np.isnan(_a)), f'Found NaN in {feature_name}'
+        assert np.all(np.isfinite(_a)), f'Found not finite value in {feature_name}'
+        if is_ragged:
+            _a = ak.flatten(_a)
+            _a = ak.values_astype(_a, np.float32)
+            _a = tf.RaggedTensor.from_row_lengths(_a, type_lengths)
+        tf_array.append(_a)
+        # del _a, a[feature_name]; gc.collect()
     tf_array = tf.stack(tf_array, axis=-1)
     return tf_array
 
@@ -148,6 +148,7 @@ def preprocess_array(a, feature_names, add_feature_names, verbose=False):
     vertex_z_valid = is_finite(a['pfCand_vertex_z']) #Used missing flag
     a_preprocessed['pfCand']['vertex_dx'] = a['pfCand_vertex_x'] - a['pv_x']
     a_preprocessed['pfCand']['vertex_dy'] = a['pfCand_vertex_y'] - a['pv_y']
+    a_preprocessed['pfCand']['vertex_z_valid'] = ak.values_astype(vertex_z_valid, np.float32)
     a_preprocessed['pfCand']['vertex_dz'] = ak.where(vertex_z_valid, (a['pfCand_vertex_z'] - a['pv_z']), np.nan)
     a_preprocessed['pfCand']['vertex_dx_tauFL'] = a['pfCand_vertex_x'] - a['pv_x'] - a['tau_flightLength_x']
     a_preprocessed['pfCand']['vertex_dy_tauFL'] = a['pfCand_vertex_y'] - a['pv_y'] - a['tau_flightLength_y']
@@ -239,7 +240,7 @@ def preprocess_array(a, feature_names, add_feature_names, verbose=False):
     delayed_computations = []
     for feature_type in feature_names.keys():
         for feature_name in feature_names[feature_type]:
-            delayed_result = delayed(process_feature)(a_done[feature_type], feature_name)
+            delayed_result = delayed(process_feature)(a_done[feature_type][feature_name])
             delayed_computations.append((feature_type, feature_name, delayed_result))
 
     # Compute all operations in parallel
@@ -247,44 +248,37 @@ def preprocess_array(a, feature_names, add_feature_names, verbose=False):
 
     # Update scaling_data with results
     for (feature_type, feature_name, _), result in zip(delayed_computations, results):
-        scaling_data[feature_type][feature_name] = result
+        a_done[feature_type][feature_name], scaling_data[feature_type][feature_name] = result
 
     # data for labels
-    label_data = dask.compute({_f: a[_f] for _f in ['sampleType', 'tauType']})
+    label_data = dask.compute({_f: a[_f] for _f in ['sampleType', 'tauType']})[0]
 
     # data for gen leve matching
     gen_data = dask.compute({_f: a[_f] for _f in ['genLepton_index', 'genJet_index', 'genLepton_kind', 
                                      'tau_pt', 'tau_eta', 'tau_phi',
-                                     'genLepton_vis_pt', 'genLepton_vis_eta', 'genLepton_vis_phi']})
+                                     'genLepton_vis_pt', 'genLepton_vis_eta', 'genLepton_vis_phi']})[0]
 
     # additional features (not used in the training)
-    add_columns = dask.compute({_f: a[_f] for _f in add_feature_names}) if add_feature_names is not None else None
+    add_columns = dask.compute({_f: a[_f] for _f in add_feature_names})[0] if add_feature_names is not None else None
 
     return a_done, scaling_data, label_data, gen_data, add_columns
 
 def compute_labels(gen_cfg, gen_data, label_data):
     # lazy compute dict with gen data
-    gen_data = {_k: _v.compute() for _k, _v in gen_data.items()}
-    
+    # gen_data = {_k: _v.compute() for _k, _v in gen_data.items()}
     # convert dictionaries to numba dict
     genLepton_match_map = dict_to_numba(gen_cfg['genLepton_match_map'], key_type=types.unicode_type, value_type=types.int32)
     genLepton_kind_map = dict_to_numba(gen_cfg['genLepton_kind_map'], key_type=types.unicode_type, value_type=types.int32)
     sample_type_map = dict_to_numba(gen_cfg['sample_type_map'], key_type=types.unicode_type, value_type=types.int32)
     tau_type_map = dict_to_numba(gen_cfg['tau_type_map'], key_type=types.unicode_type, value_type=types.int32)
-    
     # bool mask with dR gen matching
     genmatch_dR = compute_genmatch_dR(gen_data)
     is_dR_matched = genmatch_dR < gen_cfg['genmatch_dR']
-
     # recompute labels
-    recomputed_labels = recompute_tau_type(genLepton_match_map, genLepton_kind_map, sample_type_map, tau_type_map,
-                                                label_data['sampleType'], is_dR_matched,
-                                                gen_data['genLepton_index'], gen_data['genJet_index'], gen_data['genLepton_kind'], gen_data['genLepton_vis_pt'])
+    recomputed_labels = recompute_tau_type(genLepton_match_map, genLepton_kind_map, sample_type_map, tau_type_map, label_data['sampleType'], is_dR_matched, gen_data['genLepton_index'], gen_data['genJet_index'], gen_data['genLepton_kind'], gen_data['genLepton_vis_pt'])
     recomputed_labels = ak.Array(recomputed_labels)
-
     # check the fraction of recomputed labels comparing to the original
     if sum_:=np.sum(recomputed_labels != label_data["tauType"]):
         print(f'\n        [WARNING] non-zero fraction of recomputed tau types: {sum_/len(label_data["tauType"])*100:.1f}%\n')
-    
     return recomputed_labels
 
