@@ -15,6 +15,12 @@ from utils.remote_glob import remote_glob
 import awkward as ak
 import numpy as np
 
+
+# from hydra import compose, initialize
+# from omegaconf import OmegaConf
+
+# with initialize(version_base=None, config_path="configs"): cfg = compose(config_name="create_dataset")
+
 def process_files(files, cfg, dataset_type, dataset_cfg):
     import tensorflow as tf
     from utils.data_preprocessing import load_from_file, preprocess_array, awkward_to_tf, compute_labels
@@ -53,11 +59,17 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
         data = []
 
         # add awkward arrays converted to TF ragged arrays
-        for feature_type, feature_list in feature_names.items(): # do this separately for each particle collection
+        for feature_type, feature_list in feature_names.items():  # Loop over particle collections
             is_ragged = feature_type != 'global'
-            X = awkward_to_tf(a_preprocessed[feature_type], feature_list, is_ragged) # will keep only feats from feature_list
+            
+            # Only compute row lengths once per feature_type if ragged
+            type_lengths = None
+            if is_ragged:
+                type_lengths = ak.count(a_preprocessed[feature_type][feature_list[0]], axis=1)
+            
+            # Convert features to TensorFlow tensors
+            X = awkward_to_tf(a_preprocessed[feature_type], feature_list, is_ragged, type_lengths)
             data.append(X)
-            # del a_preprocessed[feature_type], X; gc.collect()
 
         # add one-hot encoded labels
         label_columns = []

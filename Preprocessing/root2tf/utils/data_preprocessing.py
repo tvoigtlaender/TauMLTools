@@ -65,21 +65,19 @@ def load_from_file(file_name, tree_name, step_size):
     a = uproot.dask(f'{file_name}:{tree_name}', step_size=step_size, library='ak', timeout=3000)
     return a
 
-def awkward_to_tf(a, feature_names, is_ragged):
-    if is_ragged:
-        type_lengths = ak.count(a[feature_names[0]], axis=1)
-    
+def awkward_to_tf(a, feature_names, is_ragged, type_lengths):    
     tf_array = []
     for feature_name in feature_names:
         _a = a[feature_name]
-        assert not np.any(np.isnan(_a)), f'Found NaN in {feature_name}'
-        assert np.all(np.isfinite(_a)), f'Found not finite value in {feature_name}'
+        if not np.all(np.isfinite(_a)):
+            raise ValueError(f"Feature '{feature_name}' contains NaN or non-finite values.")
         if is_ragged:
             _a = ak.flatten(_a)
             _a = ak.values_astype(_a, np.float32)
             _a = tf.RaggedTensor.from_row_lengths(_a, type_lengths)
+        else:
+            _a = ak.values_astype(_a, np.float32)
         tf_array.append(_a)
-        # del _a, a[feature_name]; gc.collect()
     tf_array = tf.stack(tf_array, axis=-1)
     return tf_array
 
