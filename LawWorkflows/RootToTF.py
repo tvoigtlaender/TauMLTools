@@ -19,14 +19,14 @@ def collect_files(dir_path):
         for file_name in files:
             file_path = os.path.join(root, file_name)
             file_paths.append(file_path)
-    print("file_paths", file_paths)
+    # print("file_paths", file_paths)
     return file_paths
 
 # Copy each file to the remote target
 def copy_files_to_remote(local_dir, remote_dir):
-    print("local_dir, remote_dir", local_dir, remote_dir)
+    # print("local_dir, remote_dir", local_dir, remote_dir)
     file_paths = collect_files(local_dir.path)
-    print("file_paths", file_paths)
+    # print("file_paths", file_paths)
 
     for local_file_path in file_paths:
         # Get the relative path to create the same structure on the remote side
@@ -51,7 +51,7 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
     dataset_type  = luigi.Parameter(description="which samples to read (train/validation/test)")
     # output_path   = luigi.Parameter(description="output path. Overrides 'path_to_dataset' in the cfg")
 
-    working_dir  = luigi.Parameter(description = 'Path to the working directory.')
+    # working_dir  = luigi.Parameter(description = 'Path to the working directory.')
     # data_dir  = luigi.Parameter(description = 'Path to the data directory.')
     evictable  = luigi.Parameter(default = "False", description = 'Can job be evicted without breaking?')
     num_CPUs   = luigi.Parameter(default = "None", significant = False, description = 'Number of requested CPU.')
@@ -92,6 +92,7 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
 
         # render_variables are rendered into all files sent with a job
         config.render_variables["analysis_path"] = main_dir
+        config.render_variables["copy_in"] = "False"
 
         full_req = self.requirements
         if (self.num_GPUs != "None"):
@@ -131,7 +132,7 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
             config.custom_content.append(("universe", "docker"))
             config.custom_content.append(("docker_image", self.docker_image))
             # config.custom_content.append(("docker_network_type", "host")) # Fix for xrootd issues on TOpAS, nor clear what the issue is, but it works with the host network
-            tarball_dir = os.path.abspath(f"tarballs/{self.version}")
+            tarball_dir = os.path.abspath(f"{main_dir}/tarballs/{self.version}")
             tarball_local = law.LocalFileTarget(
                 os.path.join(
                     tarball_dir,
@@ -143,7 +144,8 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
                 tarball_local.parent.touch()
                 # os.system("mkdir -p tarballs")
                 # os.system("rm tarballs/TauMLTools.tar.gz")
-                os.system(f'tar --exclude={{"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__"}} -czf {tarball_local.path}  ../TauMLTools')
+                os.system(f'tar --exclude="./tarballs" --exclude="./soft" --exclude="./data" --exclude="__pycache__" --exclude="*.root" --exclude "*.tar.gz" -czf {tarball_local.path}  .')
+                # os.system(f'tar --exclude={{"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__","TauMLTools/ShuffleMergeSpectral_0.root"}} -czf {tarball_local.path}  ../TauMLTools')
             config.input_files["Tau_tar"] = law.JobInputFile(tarball_local.path, render=False, copy=False)
             # config.input_files["copy_script"] = law.JobInputFile("copy_in.sh", render=False)
             # config.output_files.append("mlruns.tar.gz")
@@ -169,10 +171,11 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
         super(RootToTF, self).__init__(*args, **kwargs)
         # the task is re-init on the condor node, so os.path.abspath would refer to the condor node root directory
         # re-instantiating luigi parameters bypasses this and allows to pass local paths to the condor job
-        rel_cfg = os.path.relpath(self.cfg)
+        rel_cfg = os.path.relpath(self.cfg, f"{os.getenv('ANALYSIS_PATH')}/LawWorkflows")
         # print("HERE", rel_cfg)
         # print("HERE", os.path.basename(rel_cfg))
         # print("HERE", os.path.dirname(rel_cfg))
+        # exit(0)
         with initialize(config_path=os.path.dirname(rel_cfg)):
             self.cfg_dict = compose(config_name=os.path.basename(rel_cfg))
         # print(self.cfg_dict)
@@ -192,11 +195,17 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
         shutil.move(src, dest)
 
     def create_branch_map(self):
-        from create_dataset import fetch_file_list
-        _files  = self.dataset_cfg.pop('files')
-        files   = sorted([f if f.startswith('root://') else os.path.abspath(f) for f in _files ])
-        files   = fetch_file_list(files)
+        from utils.remote_glob import remote_glob
+        _files = self.dataset_cfg.pop('files')
+        files = []
+        for file_path in _files:
+            files += remote_glob(file_path)
         assert len(files), "Input file list is empty: {}".format(_files)
+        
+        # _files  = self.dataset_cfg.pop('files')
+        # files   = sorted([f if f.startswith('root://') else os.path.abspath(f) for f in _files ])
+        # files   = fetch_file_list(files)
+        # assert len(files), "Input file list is empty: {}".format(_files)
         branch_map = {i: j for i,j in enumerate(files)}
         # print("HERE", branch_map)
         return branch_map
@@ -226,7 +235,8 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
         # output_dir = os.path.join(self.output_path, self.dataset_type, file_name)
         # print(output_dir)
         # # output_target = self.remote_directory_target(output_dir)
-        output_target = self.remote_directory_target(f"{self.dataset_type}/{file_name}")
+        output_target = self.remote_directory_target(file_name)
+        # output_target = self.remote_directory_target(f"{self.dataset_type}/{file_name}")
         output_target.parent.touch()
         # print(output_target)
         # print(output_target.path)
@@ -244,8 +254,7 @@ class RootToTF(Task, HTCondorWorkflow, law.LocalWorkflow):
         print(f"file_path = {file_path}")
         result = run_job( 
             cfg           = self.cfg_dict     ,
-            dataset_type  = self.dataset_type ,
-            files         = file_path  ,
+            files         = [file_path]  ,
             dataset_cfg   = self.dataset_cfg  ,
         )
         if not result:

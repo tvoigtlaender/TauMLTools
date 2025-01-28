@@ -19,12 +19,18 @@ action() {
 
   if [[ "{{comp_facility}}" == *"ETP"* ]]; then
     export HOME=${_CONDOR_JOB_IWD}
-    tar -xzf TauMLTools*.tar.gz -C tmp
+    export ANALYSIS_PATH="${_CONDOR_JOB_IWD}/tmp/TauMLTools"
+    mkdir tmp/TauMLTools
+    tar -xzf TauMLTools*.tar.gz -C tmp/TauMLTools
     cd tmp/TauMLTools
     source env.sh docker
     #Copy in data with 64 subprocesses
-    bash copy_in.sh {{data_dir_train}} ../ 64 {{max_files_train}} train
-    bash copy_in.sh {{data_dir_val}} ../ 64 {{max_files_val}} val
+    if [[ "{{copy_in}}" == "True" ]]; then
+      bash copy_in.sh {{data_dir_train}} ../ 64 {{max_files_train}} train
+      bash copy_in.sh {{data_dir_val}} ../ 64 {{max_files_val}} val
+    fi
+    # bash copy_in.sh {{data_dir_train}} ../ 64 {{max_files_train}} train
+    # bash copy_in.sh {{data_dir_val}} ../ 64 {{max_files_val}} val
     #export X509_USER_PROXY=${HOME}/voms.proxy
     # git clone https://gitlab.etp.kit.edu/jeppelt/checkpointer.git
     # cd checkpointer
@@ -32,6 +38,7 @@ action() {
     # #export PYTHONPATH=${PYTHONPATH}:$(pwd)
     # cd -
   else
+    echo "try to source local env.sh"
     source "{{analysis_path}}/env.sh" "{{environment}}"
   fi
 }

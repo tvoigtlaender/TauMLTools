@@ -52,11 +52,11 @@ def process_feature(col):
     # Replace NaN values with 0
     no_nan_feature = ak.nan_to_num(col, nan=0)
     scaler_dict = {
-        "mean": mean,
-        "std": std,
-        "min": min_,
-        "max": max_,
-        "count": count,
+        "mean": float(mean),
+        "std": float(std),
+        "min": float(min_),
+        "max": float(max_),
+        "count": int(count),
     }
     return no_nan_feature, scaler_dict
 

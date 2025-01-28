@@ -4,73 +4,58 @@ import shutil
 # import gc
 from glob import glob
 from collections import defaultdict
-
 import hydra
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf, open_dict
-
 from utils.remote_glob import remote_glob
-
 #import tensorflow as tf
 import awkward as ak
 import numpy as np
 
-
 # from hydra import compose, initialize
 # from omegaconf import OmegaConf
-
 # with initialize(version_base=None, config_path="configs"): cfg = compose(config_name="create_dataset")
 
-def process_files(files, cfg, dataset_type, dataset_cfg):
+def process_files(files, cfg, dataset_cfg):
     import tensorflow as tf
     from utils.data_preprocessing import load_from_file, preprocess_array, awkward_to_tf, compute_labels
-    print(f'\n-> Processing input files ({dataset_type})')
-
+    # print(f'\n-> Processing input files ({dataset_type})')
     tau_type_map  = cfg['gen_cfg']['tau_type_map']
     tree_name     = cfg['tree_name']
     step_size     = cfg['step_size']
     feature_names = cfg['feature_names']
-
     n_samples = defaultdict(int)
     for file_name in files:
         time_0 = time.time()
-
         # open ROOT file, read awkward array
+        print("HALO",file_name, tree_name, step_size)
         a = load_from_file(file_name, tree_name, step_size)
         time_1 = time.time()
         if cfg['verbose']:
             print(f'\n        Loading: took {(time_1-time_0):.1f} s.')
-
         # preprocess awkward array
         a_preprocessed, scaling_data, label_data, gen_data, add_columns = preprocess_array(a, feature_names, dataset_cfg.get('add_columns'), cfg.get('verbose'))
         # del a; gc.collect()
-
         # preprocess labels
         if dataset_cfg.get('recompute_tau_type'):
             _labels = compute_labels(cfg['gen_cfg'], gen_data, label_data) # TODO
         else:
             _labels = label_data['tauType']
-
         time_2 = time.time()
         if cfg['verbose']:
             print(f'\n        Preprocessing: took {(time_2-time_1):.1f} s.\n')
-
         # final tuple with elements to be stored into TF dataset
         data = []
-
         # add awkward arrays converted to TF ragged arrays
         for feature_type, feature_list in feature_names.items():  # Loop over particle collections
             is_ragged = feature_type != 'global'
-            
             # Only compute row lengths once per feature_type if ragged
             type_lengths = None
             if is_ragged:
                 type_lengths = ak.count(a_preprocessed[feature_type][feature_list[0]], axis=1)
-            
             # Convert features to TensorFlow tensors
             X = awkward_to_tf(a_preprocessed[feature_type], feature_list, is_ragged, type_lengths)
             data.append(X)
-
         # add one-hot encoded labels
         label_columns = []
         labels = []
@@ -82,30 +67,26 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
         labels = tf.stack(labels, axis=-1)
         data.append(labels)
         # del labels, label_data; gc.collect()
-
         # save label names to the yaml cfg
         with open_dict(cfg):
             cfg["label_columns"] = label_columns
-
+            cfg["scaling_data"] = scaling_data
         # add additional columns if needed
         if add_columns is not None:
             add_columns = awkward_to_tf(add_columns, dataset_cfg['add_columns'], False)
             data.append(add_columns)
             # del add_columns; gc.collect()
-
         # create TF dataset
         dataset = tf.data.Dataset.from_tensor_slices(tuple(data))
         time_3 = time.time()
         if cfg['verbose']:
             print(f'\n        Preparing TF datasets: took {(time_3-time_2):.1f} s.')
-
         # remove existing datasets
-        path_to_dataset = to_absolute_path(f'{cfg["path_to_dataset"]}/{dataset_type}/{os.path.splitext(os.path.basename(file_name))[0]}')
+        path_to_dataset = to_absolute_path(f'{cfg["path_to_dataset"]}/{os.path.splitext(os.path.basename(file_name))[0]}')
         if os.path.exists(path_to_dataset):
             shutil.rmtree(path_to_dataset)
         else:
             os.makedirs(path_to_dataset, exist_ok=True)
-
         # save TF dataset
         dataset.save(path_to_dataset, compression='GZIP')
         OmegaConf.save(config=cfg, f=f'{path_to_dataset}/cfg.yaml')
@@ -118,10 +99,8 @@ def process_files(files, cfg, dataset_type, dataset_cfg):
 @hydra.main(config_path='configs', config_name='create_dataset')
 def main(cfg: DictConfig) -> None:
     time_start = time.time()
-
     # read from cfg
     input_data = OmegaConf.to_object(cfg['input_data'])
-
     for dataset_type in input_data.keys(): # train/val/test
         # create list of file names to open
         dataset_cfg = input_data[dataset_type]
@@ -129,19 +108,18 @@ def main(cfg: DictConfig) -> None:
         files = []
         for file_path in _files:
             files += remote_glob(file_path)
-
-        process_files(files=files, cfg=cfg, dataset_type=dataset_type, dataset_cfg=dataset_cfg)
-
-        if cfg['verbose']:
-            print(f'\n-> Dataset ({dataset_type}) contains:')
-            for k, v in n_samples.items():
-                print(f'    {k}: {v} samples')
-    
-    # save the config (to be fetched during the training)
+        process_files(files=files, cfg=cfg, dataset_cfg=dataset_cfg)
+        # if cfg['verbose']:
+        #     print(f'\n-> Dataset ({dataset_type}) contains:')
+        #     for k, v in n_samples.items():
+        #         print(f'    {k}: {v} samples')
+    time_5 = time.time()
+    # save the config (to be fetched during the training) after removing file specific data
+    for key in ['path_to_dataset', 'scaling_data', 'input_data']:
+        cfg.pop(key)
     OmegaConf.save(config=cfg, f=to_absolute_path(f'{cfg["path_to_dataset"]}/cfg.yaml')) 
-
     if cfg['verbose']:
-        print(f'\nTotal time: {(time_4-time_start):.1f} s.\n')
+        print(f'\nTotal time: {(time_5-time_start):.1f} s.\n')
 
 if __name__ == '__main__':
     main()
