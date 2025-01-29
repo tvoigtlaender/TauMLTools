@@ -102,7 +102,7 @@ def main(cfg: DictConfig) -> None:
         checkpoint_path = 'tmp_checkpoints'
         with use_strategy.scope():
             # load datasets 
-            train_data, val_data = compose_datasets(cfg["datasets"], cfg["tf_dataset_cfg"], len(logical_gpus), input_dataset_cfg)
+            train_data, val_data = compose_datasets(cfg["tf_dataset_cfg"], len(logical_gpus), input_dataset_cfg)
 
             # define model
             feature_name_to_idx = {}

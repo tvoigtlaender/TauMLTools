@@ -8,7 +8,7 @@ defaults:
 
 # mlflow
 path_to_mlflow: ./mlruns
-experiment_name: comparison_norecompute
+experiment_name: january_2025
 # experiment_name: ???
 
 # datasets
@@ -25,18 +25,22 @@ dataset_name: RootToTF # to log to mlflow for bookkeeping
 # # input_dataset_cfg: "???/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here, relative to location of train.py script
 
 
-datasets: 
-  train:
-    RootToTF: "../../../.." # will take all files from "train" subfolder of this dataset
-    #???: ??? # will take all files from "train" subfolder of this dataset, relative to location of train.py script
-  val:
-    RootToTF: "../../../.." # will take all files from "val" subfolder of this dataset
-    # ???: ??? # will take all files from "val" subfolder of this dataset, relative to location of train.py script
-input_dataset_cfg: "../../../../${dataset_name}/cfg.yaml" # will fetch feature names and labels from here
-# input_dataset_cfg: "???/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here, relative to location of train.py script
+# datasets: "/work/tvoigtlaender/TauTransformerComparison/dataloader_dev/TauMLTools/data/ShuffleMergeSpectral_*"
+#   train:
+#     RootToTF: "../../../.." # will take all files from "train" subfolder of this dataset
+#     #???: ??? # will take all files from "train" subfolder of this dataset, relative to location of train.py script
+#   val:
+#     RootToTF: "../../../.." # will take all files from "val" subfolder of this dataset
+#     # ???: ??? # will take all files from "val" subfolder of this dataset, relative to location of train.py script
+# input_dataset_cfg: "../../../../${dataset_name}/cfg.yaml" # will fetch feature names and labels from here
+# # input_dataset_cfg: "???/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here, relative to location of train.py script
 
 # TF dataset formation
 tf_dataset_cfg:
+  datasets: "/work/tvoigtlaender/TauTransformerComparison/dataloader_dev/TauMLTools/data/ShuffleMergeSpectral_*"
+  file_shuffle: False
+  file_shuffle_seed: null
+  train_val_split: 0.9
   combine_via: interleave # options: interleave, sampling
   n_threads: 10 # without controlling it may throw thread limit exception
   # smart_batching_step: null # null to disable smart batching and use a standard one

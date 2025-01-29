@@ -11,55 +11,126 @@ import pickle
 import time
 import os
 import json
+import yaml
+import random
 
-def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
+def train_val_files_split(files, train_split, shuffle=False, shuffle_seed=1234):
+    n_files = len(files)
+    if isinstance(train_split, float):
+        num_train = int(n_files * train_split)
+        train_split = [num_train, int(n_files- num_train)]
+    if sum(train_split) != n_files:
+        raise ValueError(f"Sum of train_split ({train_split}) does not match the number of files ({n_files})")
+    # split files into train and val sets
+    if shuffle:
+        random.seed(shuffle_seed)
+        random.shuffle(files)
+    train_files = files[:train_split[0]]
+    val_files = files[train_split[0]:]
+    return train_files, val_files
+
+
+def merge_statistics(scaler_data, feature_names):
+    """Merge multiple statistics dictionaries for standard scaling.
+    Args:
+        stats_list (list): A list of dictionaries containing statistics.
+    Returns:
+        dict: A merged dictionary with global mean, std, min, max, and count.
+    """
+    merged_stats = {}
+    for collection in feature_names:
+        merged_stats[collection] = {}
+        for variable in feature_names[collection]:
+            merged_stats[collection][variable] = {
+                    "mean": 0.0, "std": 0.0, "min": float("inf"), "max": float("-inf"), "count": 0
+                }
+            for file_stats in scaler_data.values():
+                # Get existing values
+                values = file_stats[collection][variable]
+                count_old = merged_stats[collection][variable]["count"]
+                count_new = values["count"]
+                total_count = count_old + count_new
+                # Compute new mean using weighted average
+                mean_old = merged_stats[collection][variable]["mean"]
+                mean_new = values["mean"]
+                merged_mean = (mean_old * count_old + mean_new * count_new) / total_count if total_count > 0 else 0.0
+                # Compute new std using pooled variance formula
+                std_old = merged_stats[collection][variable]["std"]
+                std_new = values["std"]
+                merged_variance = (
+                    (count_old * (std_old ** 2 + mean_old ** 2) + count_new * (std_new ** 2 + mean_new ** 2))
+                    / total_count
+                ) - merged_mean ** 2
+                merged_std = np.sqrt(max(merged_variance, 0))  # Ensure non-negative variance
+                # Update statistics
+                merged_stats[collection][variable]["mean"] = merged_mean
+                merged_stats[collection][variable]["std"] = merged_std
+                merged_stats[collection][variable]["min"] = min(merged_stats[collection][variable]["min"], values["min"])
+                merged_stats[collection][variable]["max"] = max(merged_stats[collection][variable]["max"], values["max"])
+                merged_stats[collection][variable]["count"] = total_count
+    return merged_stats
+
+def _load_datasets(files, element_spec=None):
+    _dataset = []
+    for p in files:
+        _dataset.append(
+            tf.data.Dataset.load(
+                p, 
+                compression='GZIP',
+                reader_func=lambda dataset: dataset.interleave(
+                    lambda x: x, 
+                    cycle_length=1, 
+                    num_parallel_calls=tf.data.AUTOTUNE
+                    ),
+                element_spec=element_spec
+                )
+            )
+    return _dataset
+
+def compose_datasets(tf_dataset_cfg, n_gpu, input_dataset_cfg):
+    datasets = glob.glob(tf_dataset_cfg["datasets"])
+    if len(datasets) == 0:
+        raise ValueError(f"No datasets found in {tf_dataset_cfg['datasets']}")
+    else:
+        print(f"Found {len(datasets)} datasets in {tf_dataset_cfg['datasets']}")
+
     if n_gpu < 1:
         global_batch_multiplier = 1
     else:
         global_batch_multiplier = n_gpu
 
+    train_files, val_files = train_val_files_split(datasets, tf_dataset_cfg["train_val_split"], tf_dataset_cfg["file_shuffle"], tf_dataset_cfg["shuffle_seed"])
+
     # NOTE: it is necessary to overwrite the reader_func of the loader if used in combination with interleave 
     #   as both the load function AND the interleave function attempt to use all available cores otherwise. 
     #   This leads to an exponential creation of threads for machines with many cores,
+    element_spec = tf.data.Dataset.load(
+        train_files[0], 
+        # compression='GZIP',
+        reader_func=lambda dataset: dataset.interleave(
+            lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
+        ).element_spec
+    _dataset_train = _load_datasets(train_files, element_spec)
+    _dataset_val = _load_datasets(val_files, element_spec)
+    
     if tf_dataset_cfg['combine_via'] == 'sampling': # compose final dataset as sampling from the set of loaded input TF datasets
-        datasets_for_training, sample_probas = _combine_datasets(datasets, load=True), None
-        train_data = tf.data.Dataset.sample_from_datasets(datasets=datasets_for_training['train'], weights=sample_probas, seed=1234, stop_on_empty_dataset=False) # True so that the last batches are not purely of one class
-        val_data = tf.data.Dataset.sample_from_datasets(datasets=datasets_for_training['val'], seed=1234, stop_on_empty_dataset=False)
+        # _dataset = tf.data.Dataset.load(p, compression='GZIP')
+        train_data = tf.data.Dataset.sample_from_datasets(datasets=_dataset_train, seed=1234, stop_on_empty_dataset=False) # True so that the last batches are not purely of one class
+        val_data = tf.data.Dataset.sample_from_datasets(datasets=_dataset_val, seed=1234, stop_on_empty_dataset=False)
+                
     elif tf_dataset_cfg['combine_via'] == 'interleave': # compose final dataset as consecutive (cycle_length=1) loading of input TF datasets
-        datasets_for_training = _combine_datasets(datasets, load=False)
-        element_spec = tf.data.Dataset.load(
-            datasets_for_training['train'][0], 
-            # compression='GZIP',
-            reader_func=lambda dataset: dataset.interleave(
-                lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
-            ).element_spec
-        cycle_length = 4 
-        block_length = 1
 
-        train_data = tf.data.Dataset.from_tensor_slices(datasets_for_training['train'])
-        train_data = train_data.interleave(
-            lambda x: tf.data.Dataset.load(
-                x, 
-                element_spec=element_spec, 
-                compression='GZIP',
-                reader_func=lambda dataset: dataset.interleave(
-                    lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
-                ),
+        cycle_length = 4
+        block_length = 1
+        train_data = tf.data.Dataset.from_tensor_slices(_dataset_train).interleave(
+            lambda x: x,
             cycle_length=cycle_length, 
             num_parallel_calls=tf.data.AUTOTUNE, 
             deterministic=False, 
             block_length=block_length,
         )
-
-        val_data = tf.data.Dataset.from_tensor_slices(datasets_for_training['val'])
-        val_data = val_data.interleave(
-            lambda x: tf.data.Dataset.load(
-                x, 
-                element_spec=element_spec, 
-                compression='GZIP',
-                reader_func=lambda dataset: dataset.interleave(
-                    lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
-                ),
+        val_data = tf.data.Dataset.from_tensor_slices(_dataset_val).interleave(
+            lambda x: x,
             cycle_length=cycle_length, 
             num_parallel_calls=tf.data.AUTOTUNE, 
             deterministic=False, 
@@ -81,61 +152,43 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
         val_data = val_data.batch(tf_dataset_cfg["val_batch_size"] * global_batch_multiplier)
     else:
         # train_data, val_data = _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
-        train_data, val_data = _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
+        # train_data, val_data = _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
+        train_data, val_data = _smart_batch_V2(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
 
-    # Add axis to global collection to 
+    # Add axis to global collection and make it ragged
     if "global" in list(input_dataset_cfg['feature_names'].keys()):
         glob_index = list(input_dataset_cfg['feature_names'].keys()).index("global")
         train_data = train_data.map(lambda *inputs: (*inputs[:glob_index], tf.RaggedTensor.from_tensor(tf.expand_dims(inputs[glob_index],axis=-2)), *inputs[glob_index+1:]))
         val_data = val_data.map(lambda *inputs: (*inputs[:glob_index], tf.RaggedTensor.from_tensor(tf.expand_dims(inputs[glob_index],axis=-2)), *inputs[glob_index+1:]))
-        
-    # Define function to get scaling from dataset
-    def get_train_dat_scaler_batch(input_data, num_collections):
-        # Innitialize scaler for each collection
-        scalers = [StandardScaler() for i in range(num_collections)]
-        # Go through all batches
-        for batch in input_data:
-            # Go through all particle collections
-            for i, collection in enumerate(batch[:num_collections]):
-                if collection.values.shape[0] > 0:
-                    scalers[i].partial_fit(collection.values)
-        scaling_data = []
-        # Return data of scalers
-        for scaler in scalers:
-            scaling_data.append({"mean":scaler.mean_, "var": scaler.var_,})
-        return scaling_data
     
     if tf_dataset_cfg["scaler"] is not None:
-        if os.path.isfile(tf_dataset_cfg["scaler"]):
-            with open(tf_dataset_cfg["scaler"]) as f:
-                scaling_data = json.load(f)
-            print(f"Scaler loaded from {tf_dataset_cfg['scaler']}.")
-        else:
-            print(f"Scaler file not found in {tf_dataset_cfg['scaler']}, calculating new scaler.")
-            start_time_ = time.time()
-            scaling_data = get_train_dat_scaler_batch(train_data, len(input_dataset_cfg['feature_names']))
-            end_time_ = time.time()
-            print("Time to create scaler: {}".format(end_time_-start_time_))
-            # Custom function to serialize NumPy arrays
-            def serialize_numpy(obj):
-                if isinstance(obj, np.ndarray):
-                    return obj.tolist()  # Convert NumPy array to list
-                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-            try:
-                os.mkdir(os.path.dirname(tf_dataset_cfg["scaler"]))
-            except:
-                pass
-            with open(tf_dataset_cfg["scaler"], "w") as file:
-                json.dump(scaling_data, file, default=serialize_numpy)
-            print(f"Scaler saved to {tf_dataset_cfg['scaler']}")
-        mlflow.log_artifacts(os.path.dirname(tf_dataset_cfg["scaler"]), "scalers")
-                
+        # Get scaler data from cfg.yaml files
+        scaler_data = {}
+        for file in train_files:
+            key = os.path.basename(file)
+            with open(f"{file}/cfg.yaml", 'rb') as f:
+                scaler_data[key] = yaml.safe_load(f)["scaling_data"]
+
+        # Merge statistics
+        merged_scaler_data = merge_statistics(scaler_data, input_dataset_cfg['feature_names'])
+
+        # Turn merged statistics into lists for Normalization layer
+        scaling_means = {}
+        scaling_stds = {}
+        for collection in input_dataset_cfg['feature_names']:
+            scaling_means[collection] = []
+            scaling_stds[collection] = []
+            for variable in input_dataset_cfg['feature_names'][collection]:
+                scaling_means[collection].append(merged_scaler_data[collection][variable]["mean"])
+                scaling_stds[collection].append(merged_scaler_data[collection][variable]["std"])
+
+        # Create scalers
         scalers = [
             tf.keras.layers.Normalization(
                 axis=-1, 
-                mean=scaling_data[i]["mean"], 
-                variance=scaling_data[i]["var"]
-            ) for i in range(len(input_dataset_cfg['feature_names']))
+                mean=scaling_means[collection], 
+                variance=scaling_stds[collection]
+            ) for collection in input_dataset_cfg['feature_names']
         ]
 
         # Define function to apply scalers
@@ -173,57 +226,6 @@ def compose_datasets(datasets, tf_dataset_cfg, n_gpu, input_dataset_cfg):
     val_data = val_data.with_options(options)
 
     return train_data, val_data
-
-def _combine_datasets(datasets, load=False):
-    datasets_for_training = {'train': [], 'val': []} # to accumulate final datasets
-    for dataset_type in datasets_for_training.keys():
-        if dataset_type not in datasets:
-            raise RuntimeError(f'key ({dataset_type}) should be present in dataset yaml configuration')
-        for dataset_name, path_to_dataset in datasets[dataset_type].items(): # loop over specified train/val datasets
-            for p in glob(
-                '{}/{}/{}/*/'.format(
-                    path_to_dataset,
-                    dataset_name,
-                    dataset_type,
-                )
-            ): # loop over all globbed files in the dataset
-                if load:
-                    _dataset = tf.data.Dataset.load(
-                        p, 
-                        compression='GZIP',
-                        reader_func=lambda dataset: dataset.interleave(
-                            lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
-                        )
-                    # _dataset = tf.data.Dataset.load(p, compression='GZIP')
-                    datasets_for_training[dataset_type].append(_dataset) 
-                else:   
-                    datasets_for_training[dataset_type].append(p)
-        # datasets_for_training[dataset_type] = datasets_for_training[dataset_type][:5]
-    return datasets_for_training
-
-def _combine_for_sampling(datasets):
-    # NB: this is a deprecated function
-    # keeping it as an example of uniform sampling across training classes
-    sample_probas = [] # to store sampling probabilites on training datasets
-    datasets_for_training = {'train': [], 'val': []} # to accumulate final datasets
-    for dataset_type in datasets_for_training.keys():
-        ds_per_tau_type = defaultdict(list)
-        if dataset_type not in datasets:
-            raise RuntimeError(f'key ({dataset_type}) should be present in dataset yaml configuration')
-        for dataset_name, dataset_cfg in datasets[dataset_type].items(): # loop over specified train/val datasets
-            for tau_type in dataset_cfg["tau_types"]: # loop over tau types specified for this dataset
-                for p in glob(f'{dataset_cfg["path_to_dataset"]}/{dataset_name}/{dataset_type}/*/{tau_type}'): # loop over all globbed files in the dataset
-                    dataset = tf.data.load(p) 
-                    ds_per_tau_type[tau_type].append(dataset) # add TF dataset (1 input file, 1 tau type) to the map  
-        
-        n_tau_types = len(ds_per_tau_type.keys())
-        for tau_type, ds_list in ds_per_tau_type.items():
-            datasets_for_training[dataset_type] += ds_list # add datasets to the final list
-            if dataset_type == "train": # for training dataset also keep corresponding sampling probas over input files
-                n_files = len(ds_list)
-                sample_probas += n_files*[1./(n_tau_types*n_files) ]
-    
-    return datasets_for_training, sample_probas
 
 def _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
     # will do smart batching based only on the sequence lengths of the **first** element (assume it to be PF candidate block)
@@ -345,6 +347,32 @@ def _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
         element_length_fn,
         bucket_boundaries=bucket_boundaries,  
         bucket_batch_sizes=batch_sizes,
+        # bucket_batch_sizes=val_batch_sizes,
+        no_padding=True
+    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
+    return bucketed_train_dataset, bucketed_val_dataset
+
+def _smart_batch_V2(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
+    
+    bucket_boundaries = np.arange(
+        tf_dataset_cfg['sequence_length_dist_start']+tf_dataset_cfg['smart_batching_step'],
+        tf_dataset_cfg['sequence_length_dist_end']+tf_dataset_cfg['smart_batching_step'],
+        tf_dataset_cfg['smart_batching_step']
+    )
+    train_batch_sizes = [tf_dataset_cfg['train_batch_size'] * global_batch_multiplier] * (len(bucket_boundaries) + 1)
+    val_batch_sizes = [tf_dataset_cfg['val_batch_size'] * global_batch_multiplier] * (len(bucket_boundaries) + 1)
+    # Bucket the training dataset by sequence length
+    bucketed_train_dataset = train_data.bucket_by_sequence_length(
+        element_length_fn,
+        bucket_boundaries=bucket_boundaries,  
+        bucket_batch_sizes=train_batch_sizes, 
+        no_padding=True
+    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
+    # Bucket the validation dataset by sequence length
+    bucketed_val_dataset = val_data.bucket_by_sequence_length(
+        element_length_fn,
+        bucket_boundaries=bucket_boundaries,  
+        bucket_batch_sizes=val_batch_sizes,
         # bucket_batch_sizes=val_batch_sizes,
         no_padding=True
     ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
