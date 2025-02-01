@@ -4,13 +4,6 @@ import tensorflow as tf
 import numpy as np
 import dask
 from dask.delayed import delayed
-
-import os
-# import gc
-import re
-from XRootD import client
-from XRootD.client.flags import DirListFlags, StatInfoFlags
-
 from utils.gen_preprocessing import compute_genmatch_dR, recompute_tau_type, dict_to_numba
 from numba.core import types
 

@@ -120,7 +120,6 @@ class EncoderLayer(tf.keras.layers.Layer):
             return out2, attn_score
         else:
             return out2
-    
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, feature_name_to_idx, embedding_kwargs, use_masked_mha, num_layers, num_heads, 
                         dim_model, dim_head_key, dim_head_value, dim_ff, activation, dropout_rate):
@@ -155,10 +154,10 @@ class Encoder(tf.keras.layers.Layer):
         attn_scores = []
         for i in range(self.num_layers):
             if return_attention_scores:
-                x, attn_score = self.enc_layers[i](x, mask, training, return_attention_scores)
+                x, attn_score = self.enc_layers[i](x, mask=mask, training=training, return_attention_scores=return_attention_scores)
                 attn_scores.append(attn_score)
             else:
-                x = self.enc_layers[i](x, mask, training, return_attention_scores)
+                x = self.enc_layers[i](x, mask=mask, training=training, return_attention_scores=return_attention_scores)
         if return_attention_scores:
             return x, attn_scores
         else:
@@ -207,16 +206,16 @@ class Transformer(tf.keras.Model):
 
         # propagate through encoder
         if self.output_attn:
-            enc_output, attn_scores = self.encoder(padded_inputs, padding_mask, training, return_attention_scores=self.output_attn)
+            enc_output, attn_scores = self.encoder(padded_inputs, mask=padding_mask, training=training, return_attention_scores=self.output_attn)
         else:
-            enc_output = self.encoder(padded_inputs, padding_mask, training, return_attention_scores=self.output_attn)
+            enc_output = self.encoder(padded_inputs, mask=padding_mask, training=training, return_attention_scores=self.output_attn)
 
          # mask padded tokens before pooling 
         # mask = tf.cast(mask, tf.float32)
         # enc_output = tf.boolean_mask(enc_output, tf.expand_dims(mask, axis=-1))
         # enc_output *= mask[...,  tf.newaxis]
-        # enc_output *= tf.expand_dims(tf.cast(mask, tf.float32), axis=-1)
-        enc_output *= tf.expand_dims(tf.cast(mask, tf.float16), axis=-1)
+        enc_output *= tf.expand_dims(tf.cast(mask, tf.float32), axis=-1)
+        # enc_output *= tf.expand_dims(tf.cast(mask, tf.float16), axis=-1)
         
         # pooling by summing over constituent dimension
         enc_output = tf.math.reduce_sum(enc_output, axis=1) 

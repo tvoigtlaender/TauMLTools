@@ -8,11 +8,11 @@ from omegaconf import DictConfig
 from sklearn.metrics import roc_auc_score
 
 import tensorflow as tf
-from tensorflow.keras import mixed_precision
-policy = mixed_precision.Policy('mixed_float16')
-mixed_precision.set_global_policy(policy)
-print('Compute dtype: %s' % policy.compute_dtype)
-print('Variable dtype: %s' % policy.variable_dtype)
+# from tensorflow.keras import mixed_precision
+# policy = mixed_precision.Policy('mixed_float16')
+# mixed_precision.set_global_policy(policy)
+# print('Compute dtype: %s' % policy.compute_dtype)
+# print('Variable dtype: %s' % policy.variable_dtype)
 
 from models.taco import TacoNet
 from models.transformer import Transformer, CustomSchedule
@@ -163,7 +163,7 @@ def main(cfg: DictConfig) -> None:
                 raise RuntimeError('Failed to infer model type')
             iterer = iter(train_data)
             X_, _ = next(iterer)
-            out1 = model(X_) # init it for correct autologging with mlflow
+            out1 = model(X_, training=False) # init it for correct autologging with mlflow
             # X2_, _ = next(iterer)
             # out2 = model(X2_) # init it for correct autologging with mlflow
 
@@ -201,7 +201,7 @@ def main(cfg: DictConfig) -> None:
             # callbacks, compile, fit
             early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=cfg["min_delta"], patience=cfg["patience"], mode='auto', restore_best_weights=True)
             model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-                filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}",
+                filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}.keras",
                 save_weights_only=False,
                 monitor='val_loss',
                 mode='min',
@@ -223,7 +223,7 @@ def main(cfg: DictConfig) -> None:
 
             path_to_hydra_logs = HydraConfig.get().run.dir
             tensorboard_logdir = f'{path_to_hydra_logs}/custom_tensorboard_logs'
-            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (100, 200))
+            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (10, 110))
 
             callbacks = [early_stopping, model_checkpoint, tensorboard_callback]
             # callbacks = [early_stopping, model_checkpoint] #, checkpointing]
@@ -235,6 +235,7 @@ def main(cfg: DictConfig) -> None:
                         metrics=['accuracy', tf.keras.metrics.AUC(from_logits=False)])
         start_time = time.time()
         model.fit(train_data, validation_data=val_data, epochs=cfg["n_epochs"], callbacks=callbacks, verbose=1)  #  steps_per_epoch=1000, 
+        # model.fit(train_data, validation_data=val_data, epochs=1, callbacks=callbacks, verbose=1, steps_per_epoch=111, validation_steps=111)
         end_time = time.time()
         print("Runtime: {}".format(end_time-start_time))
         # log info

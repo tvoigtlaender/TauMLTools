@@ -88,7 +88,7 @@ def _load_datasets(files, element_spec=None):
     return _dataset
 
 def compose_datasets(tf_dataset_cfg, n_gpu, input_dataset_cfg):
-    datasets = glob.glob(tf_dataset_cfg["datasets"])
+    datasets = glob(tf_dataset_cfg["datasets"])
     if len(datasets) == 0:
         raise ValueError(f"No datasets found in {tf_dataset_cfg['datasets']}")
     else:
@@ -171,6 +171,12 @@ def compose_datasets(tf_dataset_cfg, n_gpu, input_dataset_cfg):
 
         # Merge statistics
         merged_scaler_data = merge_statistics(scaler_data, input_dataset_cfg['feature_names'])
+        
+        # Special treatment for "particle_type" feature as it is categorical and shared between collections
+        for collection in input_dataset_cfg['feature_names']:
+            if "particle_type" in input_dataset_cfg['feature_names'][collection]:
+                merged_scaler_data[collection]["particle_type"]["mean"] = 0.
+                merged_scaler_data[collection]["particle_type"]["std"] = 1.
 
         # Turn merged statistics into lists for Normalization layer
         scaling_means = {}
@@ -353,7 +359,6 @@ def _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
     return bucketed_train_dataset, bucketed_val_dataset
 
 def _smart_batch_V2(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
-    
     bucket_boundaries = np.arange(
         tf_dataset_cfg['sequence_length_dist_start']+tf_dataset_cfg['smart_batching_step'],
         tf_dataset_cfg['sequence_length_dist_end']+tf_dataset_cfg['smart_batching_step'],
