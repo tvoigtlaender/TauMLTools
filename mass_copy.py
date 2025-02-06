@@ -105,7 +105,7 @@ def recursive_glob(xrd_client, base_path, pattern_parts):
     remaining_patterns = pattern_parts[1:]
     try:
         # This check is prone to false positives, but it's better than false negatives
-        if escape(current_pattern)!=current_pattern:
+        if escape(current_pattern) != current_pattern:
             status, dir_list = xrd_client.dirlist(base_path)
             if not status.ok:
                 print(f"Error listing directory {base_path}: {status.message}")
@@ -324,15 +324,20 @@ def mass_copy(sources, destination, max_workers=4, verbose=True):
                 current_progress = progress.tasks[task_copy].completed
                 progress.update(
                     task_copy,
-                    description=f"[green]Copying [{current_progress}/{len(files_to_copy)}]"
+                    description=f"[green]Copying [{current_progress}/{len(files_to_copy)}]",
                 )
             xrdcp_copy(src, dest)
             if verbose:
-                progress.update(task_copy, advance=1, description=f"[green]Copying [{current_progress}/{len(files_to_copy)}]")
+                progress.update(
+                    task_copy,
+                    advance=1,
+                    description=f"[green]Copying [{current_progress}/{len(files_to_copy)}]",
+                )
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             executor.map(copy_with_progress, files_to_copy)
     console.print("[green] Done!")
+
 
 if __name__ == "__main__":
     mass_copy(*sys.argv[1:])
