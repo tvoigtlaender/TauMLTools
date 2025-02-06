@@ -245,7 +245,6 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
                 exclude_str = " ".join([f"--exclude={ex}" for ex in excludes])
                 os.system(f'tar {exclude_str} -czf {tarball_local.path}  .')
             config.input_files["Tau_tar"] = law.JobInputFile(tarball_local.path, render=False, copy=False)
-            config.input_files["copy_script"] = law.JobInputFile("copy_in.sh", render=False, copy=False)
             config.output_files.append("mlruns.tar.gz")
         else:
             raise Exception('no specific setups for {self.comp_facility} computing facility')
