@@ -1,5 +1,4 @@
 from glob import glob
-from collections import defaultdict
 from omegaconf import OmegaConf
 from hydra.core.hydra_config import HydraConfig
 from sklearn.preprocessing import StandardScaler
@@ -7,28 +6,8 @@ import tensorflow as tf
 from tensorflow.python.ops import math_ops, array_ops
 import numpy as np
 import mlflow
-import pickle
-import time
 import os
-import json
 import yaml
-import random
-
-def train_val_files_split(files, train_split, shuffle=False, shuffle_seed=1234):
-    n_files = len(files)
-    if isinstance(train_split, float):
-        num_train = int(n_files * train_split)
-        train_split = [num_train, int(n_files- num_train)]
-    if sum(train_split) != n_files:
-        raise ValueError(f"Sum of train_split ({train_split}) does not match the number of files ({n_files})")
-    # split files into train and val sets
-    if shuffle:
-        random.seed(shuffle_seed)
-        random.shuffle(files)
-    train_files = files[:train_split[0]]
-    val_files = files[train_split[0]:]
-    return train_files, val_files
-
 
 def merge_statistics(scaler_data, feature_names):
     """Merge multiple statistics dictionaries for standard scaling.
@@ -88,54 +67,64 @@ def _load_datasets(files, element_spec=None):
     return _dataset
 
 def compose_datasets(tf_dataset_cfg, n_gpu, input_dataset_cfg):
-    datasets = glob(tf_dataset_cfg["datasets"])
-    if len(datasets) == 0:
-        raise ValueError(f"No datasets found in {tf_dataset_cfg['datasets']}")
-    else:
-        print(f"Found {len(datasets)} datasets in {tf_dataset_cfg['datasets']}")
-
     if n_gpu < 1:
         global_batch_multiplier = 1
     else:
         global_batch_multiplier = n_gpu
 
-    train_files, val_files = train_val_files_split(datasets, tf_dataset_cfg["train_val_split"], tf_dataset_cfg["file_shuffle"], tf_dataset_cfg["shuffle_seed"])
+    train_files = glob(tf_dataset_cfg["datasets_location"]["training"])
+    val_files = glob(tf_dataset_cfg["datasets_location"]["validation"])
+    if len(train_files) == 0 or len(val_files) == 0:
+        raise ValueError(f'No training or validation datasets found in {tf_dataset_cfg["datasets_location"]}')
+    else:
+        print(f'Found {len(train_files)} training datasets in {tf_dataset_cfg["datasets_location"]["training"]}')
+        print(f'Found {len(val_files)} validation datasets in {tf_dataset_cfg["datasets_location"]["validation"]}')
 
     # NOTE: it is necessary to overwrite the reader_func of the loader if used in combination with interleave 
     #   as both the load function AND the interleave function attempt to use all available cores otherwise. 
     #   This leads to an exponential creation of threads for machines with many cores,
-    element_spec = tf.data.Dataset.load(
-        train_files[0], 
-        # compression='GZIP',
-        reader_func=lambda dataset: dataset.interleave(
-            lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
-        ).element_spec
-    _dataset_train = _load_datasets(train_files, element_spec)
-    _dataset_val = _load_datasets(val_files, element_spec)
+    element_spec = tf.data.Dataset.load(train_files[0], compression='GZIP').element_spec
     
     if tf_dataset_cfg['combine_via'] == 'sampling': # compose final dataset as sampling from the set of loaded input TF datasets
         # _dataset = tf.data.Dataset.load(p, compression='GZIP')
+        _dataset_train = _load_datasets(train_files, element_spec)
+        _dataset_val = _load_datasets(val_files, element_spec)
         train_data = tf.data.Dataset.sample_from_datasets(datasets=_dataset_train, seed=1234, stop_on_empty_dataset=False) # True so that the last batches are not purely of one class
         val_data = tf.data.Dataset.sample_from_datasets(datasets=_dataset_val, seed=1234, stop_on_empty_dataset=False)
-                
+        
     elif tf_dataset_cfg['combine_via'] == 'interleave': # compose final dataset as consecutive (cycle_length=1) loading of input TF datasets
 
+        # This code only works up to tf 2.10
+        # there is no way to use the load function with interleave after that
         cycle_length = 4
         block_length = 1
-        train_data = tf.data.Dataset.from_tensor_slices(_dataset_train).interleave(
-            lambda x: x,
+        train_data_ = tf.data.Dataset.from_tensor_slices(train_files)
+        train_data = train_data_.interleave(
+            lambda x: tf.data.Dataset.load(
+                x, 
+                element_spec=element_spec, 
+                compression='GZIP',
+                reader_func=lambda dataset: dataset.interleave(
+                    lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
+                ),
             cycle_length=cycle_length, 
             num_parallel_calls=tf.data.AUTOTUNE, 
             deterministic=False, 
-            block_length=block_length,
-        )
-        val_data = tf.data.Dataset.from_tensor_slices(_dataset_val).interleave(
-            lambda x: x,
+            block_length=block_length)
+
+        val_data_ = tf.data.Dataset.from_tensor_slices(val_files)
+        val_data = val_data_.interleave(
+            lambda x: tf.data.Dataset.load(
+                x, 
+                element_spec=element_spec, 
+                compression='GZIP',
+                reader_func=lambda dataset: dataset.interleave(
+                    lambda x: x, cycle_length=1, num_parallel_calls=tf.data.AUTOTUNE)
+                ),
             cycle_length=cycle_length, 
             num_parallel_calls=tf.data.AUTOTUNE, 
             deterministic=False, 
-            block_length=block_length,
-        )
+            block_length=block_length)
     else:
         raise ValueError("`combine_via` should be either 'sampling' or 'interleave'")
         
@@ -296,8 +285,9 @@ def log_to_mlflow(model, cfg):
 
     # log data params
     mlflow.log_param('dataset_name', cfg["dataset_name"])
-    mlflow.log_param('datasets_train', cfg["datasets"]["train"].keys())
-    mlflow.log_param('datasets_val', cfg["datasets"]["val"].keys())
+    mlflow.log_param('datasets_cfg',  cfg["input_files"]["cfg"])
+    mlflow.log_param('datasets_train',  cfg["input_files"]["train"])
+    mlflow.log_param('datasets_val',  cfg["input_files"]["val"])
     mlflow.log_params(cfg['tf_dataset_cfg'])
 
     # log model params

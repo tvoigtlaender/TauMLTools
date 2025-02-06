@@ -1,27 +1,25 @@
 ## see https://github.com/riga/law/tree/master/examples/htcondor_at_cern
 
-import six
 import law
 import subprocess
 import os
 import re
-import sys
-import shutil
 import math
 import select
-
+from hydra import compose, initialize
 from .framework import Task, HTCondorWorkflow, startup_time
 import luigi
+from mass_copy import mass_copy
 from law.util import interruptable_popen
 law.contrib.load("wlcg")
 
 class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
 
     working_dir  = luigi.Parameter(description = 'Path to the working directory.')
-    data_dir_train  = luigi.Parameter(description = 'Path to the data directory of training data.')
-    data_dir_val  = luigi.Parameter(description = 'Path to the data directory of validation data.')
-    max_files_train  = luigi.Parameter(default = "10000000", description = 'Maximum number of files allowed for training')
-    max_files_val  = luigi.Parameter(default = "10000000", description = 'Maximum number of files allowed for validation')
+    # data_dir_train  = luigi.Parameter(description = 'Path to the data directory of training data.')
+    # data_dir_val  = luigi.Parameter(description = 'Path to the data directory of validation data.')
+    # max_files_train  = luigi.Parameter(default = "10000000", description = 'Maximum number of files allowed for training')
+    # max_files_val  = luigi.Parameter(default = "10000000", description = 'Maximum number of files allowed for validation')
     evictable  = luigi.Parameter(default = "False", description = 'Can job be evicted without breaking?')
     num_CPUs   = luigi.Parameter(default = "None", significant = False, description = 'Number of requested CPU.')
     num_GPUs   = luigi.Parameter(default = "None", significant = False, description = 'Number of requested GPU.')
@@ -215,11 +213,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         elif self.comp_facility == "ETP":
             # Use proxy file located in $X509_USER_PROXY or /tmp/x509up_u$(id) if empty data_dir_val
             htcondor_user_proxy = law.wlcg.get_vomsproxy_file()
-            config.render_variables["data_dir_train"] = self.data_dir_train
-            config.render_variables["data_dir_val"] = self.data_dir_val
             config.render_variables["comp_facility"] = self.comp_facility
-            config.render_variables["max_files_train"] = self.max_files_train
-            config.render_variables["max_files_val"] = self.max_files_val
             config.custom_content.append(("x509userproxy", htcondor_user_proxy))
             config.custom_content.append(('+RemoteJob', 'True'))
             config.custom_content.append(("+RequestWalltime", int(math.floor(self.max_runtime * 3600)) - 1))
@@ -247,13 +241,10 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
             )
             if not tarball_local.exists():
                 tarball_local.parent.touch()
-                os.system(f'tar --exclude={{"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__"}} -czf {tarball_local.path}  ../TauMLTools')
+                excludes = ["./.[^.]*", "./Analysis", "./Production", "./Evaluation", "./Core", "./Preprocessing", "./RunKit", "./soft", "./data", "./tarballs", "*/outputs", "*/mlruns", "__pycache__"]
+                exclude_str = " ".join([f"--exclude={ex}" for ex in excludes])
+                os.system(f'tar {exclude_str} -czf {tarball_local.path}  .')
             config.input_files["Tau_tar"] = law.JobInputFile(tarball_local.path, render=False, copy=False)
-            
-            # os.system("mkdir -p tarballs")
-            # os.system("rm tarballs/TauMLTools.tar.gz")
-            # os.system('tar --exclude={"TauMLTools/tarballs","TauMLTools/soft","TauMLTools/data","__pycache__"} -czf tarballs/TauMLTools.tar.gz  ../TauMLTools')
-            # config.input_files["Tau_tar"] = law.JobInputFile("tarballs/TauMLTools.tar.gz", render=False)
             config.input_files["copy_script"] = law.JobInputFile("copy_in.sh", render=False, copy=False)
             config.output_files.append("mlruns.tar.gz")
         else:
@@ -272,15 +263,17 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         return config
 
     def create_branch_map(self):
-
         # Opening file
         print(f"Reading commands from file: {self.input_cmds}")
-        file1 = open(self.input_cmds, 'r')
-        self.cmds_list = []
-        for line in file1:
-            self.cmds_list.append(line)
-        file1.close()
-        return {i: cmd for i, cmd in enumerate(self.cmds_list)}
+        self.cmds_list = {}
+        with open(self.input_cmds, 'r') as file1:
+            for i, line in enumerate(file1):
+                match_conf = re.search(r'--config-name\s+(\S+)(\s|$)', line)
+                match_inp = re.search(r'input_files=(\S+)(\s|$)', line)
+                if not match_conf or not match_inp:
+                    raise Exception(f"Command {i} needs to contain --config-name argument and input_files overide.")
+                self.cmds_list[i] = {"command": line, "cfg": match_conf.group(1), "input_files": match_inp.group(1)}
+        return self.cmds_list
 
     def output(self):
         # print("HERE","files/mlruns_{}To{}.tar.gz".format(self.branch, int(self.branch) + 1))
@@ -294,9 +287,27 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
     def run(self):
         if not os.path.exists(os.path.abspath(self.working_dir)):
             raise Exception('Working folder {} does not exist'.format(self.working_dir))
-
-        self.run_command_readable(self.branch_data, run_location=self.working_dir)
-        # self.run_command(self.branch_data, run_location=self.working_dir)
+        
+        command = self.branch_data["command"]
+        cfg = self.branch_data["cfg"]
+        input_files_cfg = self.branch_data["input_files"]
+        position_from_law_dir = "../"
+        full_cfg = position_from_law_dir + self.working_dir + cfg
+        
+        # Copy in training files
+        with initialize(version_base=None, config_path=os.path.dirname(full_cfg)): 
+            cfg_data = compose(config_name=os.path.basename(full_cfg), overrides=[f"input_files={input_files_cfg}"])
+        
+        paths_cfg = cfg_data["input_files"]["cfg"]
+        paths_train = cfg_data["input_files"]["train"]
+        paths_val = cfg_data["input_files"]["val"]
+        
+        mass_copy(paths_cfg, os.path.abspath(f"{self.working_dir}/data/"))
+        mass_copy(paths_train, os.path.abspath(f"{self.working_dir}/data/train"), max_workers=64)
+        mass_copy(paths_val, os.path.abspath(f"{self.working_dir}/data/val"), max_workers=64)
+        
+        self.run_command_readable(command, run_location=self.working_dir)
+        # self.run_command(command, run_location=self.working_dir)
         if self.comp_facility == "ETP":
             self.run_command(
                 "tar -czf ${{LAW_JOB_INIT_DIR}}/mlruns_{}To{}.tar.gz mlruns".format(

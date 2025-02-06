@@ -4,43 +4,22 @@ hydra: # disable usage of hydra log directory as cwd
 
 defaults:
   - model@model: transformer
+  - input_files: all_train_files
   - _self_
 
 # mlflow
 path_to_mlflow: ./mlruns
-experiment_name: january_2025
-# experiment_name: ???
+experiment_name: Jan_2025_Transformer
 
 # datasets
-dataset_name: RootToTF # to log to mlflow for bookkeeping
-# dataset_name: ??? # to log to mlflow for bookkeeping
-# datasets: 
-#   train:
-#     RootToTF: "/work/tvoigtlaender/TauTransformerComparison/KingMaker/" # will take all files from "train" subfolder of this dataset
-#     #???: ??? # will take all files from "train" subfolder of this dataset, relative to location of train.py script
-#   val:
-#     RootToTF: "/work/tvoigtlaender/TauTransformerComparison/KingMaker/" # will take all files from "val" subfolder of this dataset
-#     # ???: ??? # will take all files from "val" subfolder of this dataset, relative to location of train.py script
-# input_dataset_cfg: "/work/tvoigtlaender/TauTransformerComparison/KingMaker/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here
-# # input_dataset_cfg: "???/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here, relative to location of train.py script
-
-
-# datasets: "/work/tvoigtlaender/TauTransformerComparison/dataloader_dev/TauMLTools/data/ShuffleMergeSpectral_*"
-#   train:
-#     RootToTF: "../../../.." # will take all files from "train" subfolder of this dataset
-#     #???: ??? # will take all files from "train" subfolder of this dataset, relative to location of train.py script
-#   val:
-#     RootToTF: "../../../.." # will take all files from "val" subfolder of this dataset
-#     # ???: ??? # will take all files from "val" subfolder of this dataset, relative to location of train.py script
-# input_dataset_cfg: "../../../../${dataset_name}/cfg.yaml" # will fetch feature names and labels from here
-# # input_dataset_cfg: "???/${dataset_name}/cfg.yaml" # will fetch feature names and labels from here, relative to location of train.py script
+dataset_name: january_2025_V1 # to log to mlflow for bookkeeping
 
 # TF dataset formation
 tf_dataset_cfg:
-  datasets: "/work/tvoigtlaender/TauTransformerComparison/dataloader_dev/TauMLTools/data/ShuffleMergeSpectral_*"
-  file_shuffle: False
-  file_shuffle_seed: null
-  train_val_split: 0.9
+  datasets_location: 
+    training: "data/train/*"
+    validation: "data/val/*"
+    dataset_cfg: "data/cfg.yaml"
   combine_via: interleave # options: interleave, sampling
   n_threads: 10 # without controlling it may throw thread limit exception
   # smart_batching_step: null # null to disable smart batching and use a standard one
@@ -56,7 +35,7 @@ tf_dataset_cfg:
   train_batch_size: 400
   val_batch_size: 400
   classes: ["tau", "e", "mu", "jet"] # will pick only those labels (in this order)
-  scaler: "scalers/part_dataset.json"
+  scaler: True
 
 # LR schedule
 # schedule: dynamic # custom // null // decrease

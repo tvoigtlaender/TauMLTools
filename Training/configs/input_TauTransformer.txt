@@ -1,0 +1,1 @@
+python train.py model=transformer  input_files=used_train_files_ensemble_run0_chunk0 --config-name configs/train.yaml 

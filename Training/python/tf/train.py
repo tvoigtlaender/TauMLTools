@@ -96,7 +96,8 @@ def main(cfg: DictConfig) -> None:
         run_id = active_run.info.run_id
         
         # load cfg used for the dataset composition
-        with open(cfg['input_dataset_cfg'], "r") as f:
+        with open(cfg["tf_dataset_cfg"]["datasets_location"]["dataset_cfg"], "r") as f:
+            print(f'Loading dataset config from {cfg["input_files"]["cfg"]}.yml')
             input_dataset_cfg = yaml.safe_load(f)
 
         checkpoint_path = 'tmp_checkpoints'

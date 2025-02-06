@@ -16,7 +16,7 @@ def get_type(col):
     else:
         raise ValueError(f"Unsupported dimension: {col.ndim}")
 
-def is_finite(col, dask_array=True):
+def is_finite(col):
     # Get the min and max values for the given column
     primitive_type_col = get_type(col)
     if np.issubdtype(primitive_type_col, np.integer):
