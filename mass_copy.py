@@ -4,6 +4,7 @@ Supports parallel directory exploration and file copying with progress tracking.
 """
 
 import os
+import sys
 from glob import glob, escape
 import fnmatch
 from urllib.parse import urlparse
@@ -153,8 +154,14 @@ def xrdcp_copy(source, destination):
     Handles both local-to-remote and remote-to-local transfers.
     """
     try:
+        # Ensure destination has proper format
+        if check_if_local(destination):
+            # Local paths need file:// prefix for XRootD
+            formatted_dest = f"file://{os.path.abspath(destination)}"
+        else:
+            formatted_dest = destination
         cp = CopyProcess()
-        cp.add_job(source, destination)
+        cp.add_job(source, formatted_dest)
         status = cp.prepare()
         if not status.ok:
             print(f"Error preparing copy {source} -> {destination}: {status.message}")
@@ -219,8 +226,7 @@ def list_all_files(paths, max_workers=4):
             dirs_to_explore.append((client_url, matched_path, parsed.path))
         else:
             # For direct file matches, use parent dir as base
-            base_path = os.path.dirname(matched_path)
-            all_files.append((base_path, matched_path))
+            all_files.append((matched_path, matched_path))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = set()
         while dirs_to_explore and len(futures) < max_workers:
@@ -318,11 +324,15 @@ def mass_copy(sources, destination, max_workers=4, verbose=True):
                 current_progress = progress.tasks[task_copy].completed
                 progress.update(
                     task_copy,
-                    description=f"[green]Copying [{current_progress}/{len(files_to_copy)}]",
-                    advance=1,
+                    description=f"[green]Copying [{current_progress}/{len(files_to_copy)}]"
                 )
             xrdcp_copy(src, dest)
+            if verbose:
+                progress.update(task_copy, advance=1, description=f"[green]Copying [{current_progress}/{len(files_to_copy)}]")
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             executor.map(copy_with_progress, files_to_copy)
     console.print("[green] Done!")
+
+if __name__ == "__main__":
+    mass_copy(*sys.argv[1:])
