@@ -267,11 +267,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         self.cmds_list = {}
         with open(self.input_cmds, 'r') as file1:
             for i, line in enumerate(file1):
-                match_conf = re.search(r'--config-name\s+(\S+)(\s|$)', line)
-                match_inp = re.search(r'input_files=(\S+)(\s|$)', line)
-                if not match_conf or not match_inp:
-                    raise Exception(f"Command {i} needs to contain --config-name argument and input_files overide.")
-                self.cmds_list[i] = {"command": line, "cfg": match_conf.group(1), "input_files": match_inp.group(1)}
+                self.cmds_list[i] = {"command": line}
         return self.cmds_list
 
     def output(self):
@@ -288,8 +284,12 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
             raise Exception('Working folder {} does not exist'.format(self.working_dir))
         
         command = self.branch_data["command"]
-        cfg = self.branch_data["cfg"]
-        input_files_cfg = self.branch_data["input_files"]
+        # match_conf = re.search(r'--config-name\s+(\S+)(\s|$)', command)
+        match_inp = re.search(r'input_files=(\S+)(\s|$)', command)
+        # Currently hardcoded
+        cfg = "configs/train.yaml"
+        # cfg = match_conf.group(1)
+        input_files_cfg = match_inp.group(1)
         position_from_law_dir = "../"
         full_cfg = position_from_law_dir + self.working_dir + cfg
         
@@ -301,7 +301,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         paths_train = cfg_data["input_files"]["train"]
         paths_val = cfg_data["input_files"]["val"]
         
-        mass_copy(paths_cfg, os.path.abspath(f"{self.working_dir}/data/"))
+        mass_copy(paths_cfg, os.path.abspath(f"{self.working_dir}/data/cfg.yaml"))
         mass_copy(paths_train, os.path.abspath(f"{self.working_dir}/data/train"), max_workers=64)
         mass_copy(paths_val, os.path.abspath(f"{self.working_dir}/data/val"), max_workers=64)
         
