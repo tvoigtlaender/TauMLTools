@@ -38,7 +38,11 @@ def process_feature(col):
         collumn = ak.flatten(collumn)
     # Get the mean, std and non-NaN count of the column
     mean = ak.nanmean(collumn)
+    # "particle_type" will have only one kind of entry for non-pfCand collections
+    # This is expected, but can lead to nan std values
     std = ak.nanstd(collumn)
+    if np.isnan(std):
+        std = 0
     min_ = ak.nanmin(collumn)
     max_ = ak.nanmax(collumn)
     count = ak.sum(is_finite(collumn))
@@ -153,6 +157,8 @@ def preprocess_array(a, feature_names, add_feature_names, verbose=False):
     a_preprocessed['pfCand']['dxy_sig'] = ak.where(has_track_details_dxy_sig_finite, (np.abs(a['pfCand_dxy'])/a['pfCand_dxy_error']), np.nan)
     a_preprocessed['pfCand']['dz_sig_valid'] = ak.values_astype(has_track_details_dz_sig_finite, np.float32)
     a_preprocessed['pfCand']['dz_sig'] = ak.where(has_track_details_dz_sig_finite, (np.abs(a['pfCand_dz'])/a['pfCand_dz_error']), np.nan)
+    a_preprocessed['pfCand']['dz_valid'] = ak.values_astype(has_track_details_dz_sig_finite, np.float32)
+    a_preprocessed['pfCand']['dz'] = ak.where(is_finite(a['pfCand_dz']), a['pfCand_dz'], np.nan)
     a_preprocessed['pfCand']['track_ndof_valid'] = ak.values_astype(has_track_details_track_ndof, np.float32)
     a_preprocessed['pfCand']['track_ndof'] = ak.where(has_track_details_track_ndof, a['pfCand_track_ndof'], np.nan)
     a_preprocessed['pfCand']['chi2_ndof'] = ak.where(has_track_details_track_ndof, (a['pfCand_track_chi2']/a['pfCand_track_ndof']), np.nan)

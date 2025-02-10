@@ -25,6 +25,7 @@ feature_names:
   - dxy
   - dxy_sig_valid
   - dxy_sig
+  - dz_valid
   - dz
   - dz_sig_valid
   - dz_sig
