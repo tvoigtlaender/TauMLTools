@@ -284,6 +284,7 @@ def mass_copy(sources, destination, max_workers=4, verbose=True):
         max_workers: Maximum number of parallel copy operations
         verbose: Whether to show progress bars and status messages
     """
+    max_workers = int(max_workers)
     if isinstance(sources, str):
         sources = [sources]
     try:
