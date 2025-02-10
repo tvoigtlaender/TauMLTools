@@ -27,7 +27,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
     cuda_memory  = luigi.Parameter(default = "None", significant = False, description = 'Amount of necessary device memory.')
     input_cmds   = luigi.Parameter(description = 'Path to the txt file with input commands.')
     requirements = luigi.Parameter(default=f"(OpSysAndVer =?= \"CentOS7\")", significant = False, description = 'HTCondor requirements')
-    max_disk  = luigi.Parameter(default = 'None', significant = False, description = 'maximum scratch space usage')
+    max_disk  = luigi.Parameter(default = 'auto', significant = False, description = 'maximum scratch space usage')
     max_runtime = law.DurationParameter(default=12.0, unit="h", significant=False, description="maximum runtime")
     max_memory  = luigi.Parameter(default = '2000', significant = False, description = 'maximum RAM usage')
     docker_image = luigi.Parameter(default='None', significant=False, description='Used docker image')
@@ -180,6 +180,23 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
             raise Exception("No command provided.")
 
     def htcondor_job_config(self, config, job_num, branches):
+        if self.max_memory == "auto":
+            command = self.create_branch_map()[branches[0]]["command"]
+            match_inp = re.search(r'input_files=(\S+)(\s|$)', command)
+            # Currently hardcoded
+            cfg = "configs/train.yaml"
+            # cfg = match_conf.group(1)
+            input_files_cfg = match_inp.group(1)
+            position_from_law_dir = "../"
+            full_cfg = position_from_law_dir + self.working_dir + cfg
+            # Copy in training files
+            with initialize(version_base=None, config_path=os.path.dirname(full_cfg)): 
+                cfg_data = compose(config_name=os.path.basename(full_cfg), overrides=[f"input_files={input_files_cfg}"])
+            num_files = len(cfg_data["input_files"]["train"]) + len(cfg_data["input_files"]["val"])
+            request_disk = (num_files + 10) * 1000 * 1000
+        else:
+            request_disk = self.max_disk
+
         config.custom_content = []
         main_dir = os.getenv("ANALYSIS_PATH")
         report_dir = str(self.htcondor_output_directory().path)
@@ -225,7 +242,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
             # config.custom_content.append(('Request_GPUMemoryMB', '0'))
             if self.evictable:
                 config.custom_content.append(('+evictable', self.evictable))
-            config.custom_content.append(('RequestDisk', f'{self.max_disk}'))
+            config.custom_content.append(('RequestDisk', f'{request_disk}'))
             config.custom_content.append(('accounting_group', self.accounting_group))
             config.custom_content.append(("universe", "docker"))
             config.custom_content.append(("docker_image", self.docker_image))
@@ -301,7 +318,7 @@ class Training(Task, HTCondorWorkflow, law.LocalWorkflow):
         paths_train = cfg_data["input_files"]["train"]
         paths_val = cfg_data["input_files"]["val"]
         
-        mass_copy(paths_cfg, os.path.abspath(f"{self.working_dir}/data/cfg.yaml"))
+        mass_copy(paths_cfg, os.path.abspath(f"{self.working_dir}/data/"))
         mass_copy(paths_train, os.path.abspath(f"{self.working_dir}/data/train"), max_workers=64)
         mass_copy(paths_val, os.path.abspath(f"{self.working_dir}/data/val"), max_workers=64)
         

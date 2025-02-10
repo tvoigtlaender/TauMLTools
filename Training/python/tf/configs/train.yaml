@@ -57,7 +57,7 @@ beta_2: 0.999 # only for adam/adamw/radam
 epsilon: 1e-7 # only for adam/adamw/radam
 
 # training
-n_epochs: 1
+n_epochs: 100
 min_delta: 0.0001
 patience: 10
 

@@ -31,12 +31,12 @@ def main(cfg: DictConfig) -> None:
         threads_per_core = 2
         n_cpus = int(cpu_config["cores"])
         if not "OMP_NUM_THREADS" in os.environ:
-          print('"OMP_NUM_THREADS" is not set defaulting to a maximum of 1 CPU core.')
-          cpu_max = 4
+            print('"OMP_NUM_THREADS" is not set defaulting to a maximum of 1 CPU core.')
+            cpu_max = 4
         else:
-          cpu_max = int(os.getenv("OMP_NUM_THREADS"))
+            cpu_max = int(os.getenv("OMP_NUM_THREADS"))
         if n_cpus > cpu_max:
-          raise Exception("More CPU cores assigned than available.")
+            raise Exception("More CPU cores assigned than available.")
         available_threads = n_cpus * threads_per_core
         print("{} CPUs with a total of {} threads are available.".format(os.getenv("OMP_NUM_THREADS"), available_threads))
         intra_threads = cpu_config["intra"]
@@ -202,7 +202,7 @@ def main(cfg: DictConfig) -> None:
             # callbacks, compile, fit
             early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=cfg["min_delta"], patience=cfg["patience"], mode='auto', restore_best_weights=True)
             model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-                filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}.keras",
+                filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}",
                 save_weights_only=False,
                 monitor='val_loss',
                 mode='min',
@@ -235,7 +235,7 @@ def main(cfg: DictConfig) -> None:
                         loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False), 
                         metrics=['accuracy', tf.keras.metrics.AUC(from_logits=False)])
         start_time = time.time()
-        model.fit(train_data, validation_data=val_data, epochs=cfg["n_epochs"], callbacks=callbacks, verbose=1)  #  steps_per_epoch=1000, 
+        model.fit(train_data, validation_data=val_data, epochs=cfg["n_epochs"], callbacks=callbacks, verbose=2) #, steps_per_epoch=1000)
         # model.fit(train_data, validation_data=val_data, epochs=1, callbacks=callbacks, verbose=1, steps_per_epoch=111, validation_steps=111)
         end_time = time.time()
         print("Runtime: {}".format(end_time-start_time))
