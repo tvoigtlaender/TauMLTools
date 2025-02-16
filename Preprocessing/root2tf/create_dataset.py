@@ -8,6 +8,7 @@ import hydra
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf, open_dict
 from utils.remote_glob import remote_glob
+from utils.tfio import write_tfrecord, serialize_spec
 #import tensorflow as tf
 import awkward as ak
 import numpy as np
@@ -72,10 +73,10 @@ def process_files(files, cfg, dataset_cfg):
             cfg["label_columns"] = label_columns
             cfg["scaling_data"] = scaling_data
         # add additional columns if needed
-        if add_columns is not None:
-            add_columns = awkward_to_tf(add_columns, dataset_cfg['add_columns'], False)
-            data.append(add_columns)
-            # del add_columns; gc.collect()
+        # if add_columns is not None:
+        #     add_columns = awkward_to_tf(add_columns, dataset_cfg['add_columns'], False)
+        #     data.append(add_columns)
+        #     # del add_columns; gc.collect()
         # create TF dataset
         dataset = tf.data.Dataset.from_tensor_slices(tuple(data))
         time_3 = time.time()
@@ -88,7 +89,17 @@ def process_files(files, cfg, dataset_cfg):
         else:
             os.makedirs(path_to_dataset, exist_ok=True)
         # save TF dataset
-        dataset.save(path_to_dataset, compression='GZIP')
+        if cfg.get("file_format") == "tfsave":
+            # Saving as tf save files
+            dataset.save(path_to_dataset, compression='GZIP')
+        elif cfg.get("file_format") == "tfrecord":
+            # Saving as tf Record
+            with open_dict(cfg):
+                cfg["element_spec"] = serialize_spec(dataset.element_spec)
+            write_tfrecord(dataset, f'{path_to_dataset}/data.tfrecord')
+        else:
+            raise ValueError(f"Unsupported file format: {cfg.get('file_format')}")
+            
         OmegaConf.save(config=cfg, f=f'{path_to_dataset}/cfg.yaml')
         time_4 = time.time()
         if cfg['verbose']:
