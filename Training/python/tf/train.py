@@ -5,28 +5,47 @@ import hydra
 import time
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
-from sklearn.metrics import roc_auc_score
 
-import tensorflow as tf
-# from tensorflow.keras import mixed_precision
-# policy = mixed_precision.Policy('mixed_float16')
-# mixed_precision.set_global_policy(policy)
-# print('Compute dtype: %s' % policy.compute_dtype)
-# print('Variable dtype: %s' % policy.variable_dtype)
-
-from models.taco import TacoNet
-from models.transformer import Transformer, CustomSchedule
-from models.particle_net import ParticleNet
-from utils.training import compose_datasets, log_to_mlflow
-# from checkpointer.keras_callback import KerasCheckpointerCallback
-import mlflow
-mlflow.tensorflow.autolog(log_models=False) 
+def pre_import_gpu(cfg):
+    if cfg.get("gpu"):
+        gpu_config = cfg["gpu"]
+        if os.getenv("CUDA_VISIBLE_DEVICES"):
+            visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
+        else:
+            if not gpu_config == "all":
+                # Use default if all GPUs are requested
+                visible_devices = gpu_config
+            os.environ["CUDA_VISIBLE_DEVICES"] = visible_devices
+        print("Trying to use GPUs: {}".format(visible_devices))
+        return visible_devices
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        print("Trying to use no GPUs")
+        return ""
 
 @hydra.main(config_path='configs', config_name='train')
 def main(cfg: DictConfig) -> None:
-    print(cfg)
+    
+    visible_gpu = pre_import_gpu(cfg)
+    
+    import tensorflow as tf
+    # from tensorflow.keras import mixed_precision
+    # policy = mixed_precision.Policy('mixed_float16')
+    # mixed_precision.set_global_policy(policy)
+    # print('Compute dtype: %s' % policy.compute_dtype)
+    # print('Variable dtype: %s' % policy.variable_dtype)
+
+    from models.taco import TacoNet
+    from models.transformer import Transformer, CustomSchedule
+    from models.particle_net import ParticleNet
+    from utils.training import compose_datasets, log_to_mlflow
+    import mlflow
+    mlflow.tensorflow.autolog(log_models=False, log_datasets=False) 
+    # from checkpointer.keras_callback import KerasCheckpointerCallback
+    
+    
     cpus = tf.config.list_physical_devices('CPU')
-    if cpus:
+    if cpus and cfg.get("cpu"):
         cpu_config = cfg["cpu"]
         threads_per_core = 2
         n_cpus = int(cpu_config["cores"])
@@ -35,6 +54,8 @@ def main(cfg: DictConfig) -> None:
             cpu_max = 4
         else:
             cpu_max = int(os.getenv("OMP_NUM_THREADS"))
+            # Overwrite for solo TOpAS
+        cpu_max  = 255
         if n_cpus > cpu_max:
             raise Exception("More CPU cores assigned than available.")
         available_threads = n_cpus * threads_per_core
@@ -46,40 +67,32 @@ def main(cfg: DictConfig) -> None:
                 intra_threads, inter_threads, available_threads
             ))
         print("Using {} for intra op parallelism and {} for inter op parallelism.".format(intra_threads, inter_threads))
-        tf.config.threading.set_intra_op_parallelism_threads(intra_threads)
-        tf.config.threading.set_inter_op_parallelism_threads(inter_threads)
-    # setup gpu
+        # Overwrite for solo TOpAS
+        # tf.config.threading.set_intra_op_parallelism_threads(intra_threads) 
+        # tf.config.threading.set_inter_op_parallelism_threads(inter_threads)
+        tf.config.threading.set_inter_op_parallelism_threads(25)
+        tf.config.threading.set_intra_op_parallelism_threads(255)
+        tf.config.set_soft_device_placement(True)
+        tf.config.optimizer.set_jit(True)
+    else:
+        print("No cpu config set up. Leaving as is.")
 
+    # setup gpu
     gpus = tf.config.list_physical_devices('GPU')
     if gpus:
-        gpu_config = cfg["gpu"]
-        print("Use GPUs {}.".format(gpu_config['gpu_index']))
-        try:
-            use_gpus = gpu_config['gpu_index']
-            if isinstance(use_gpus, int):
-                use_gpus = [use_gpus]
-            valid_gpus = [gpu for i_gpu, gpu in enumerate(gpus) if i_gpu in use_gpus]
-            tf.config.set_visible_devices(valid_gpus, 'GPU')
-            for gpu in valid_gpus:
-                if 'gpu_mem' in gpu_config.keys():
-                    print("Set device memory limit of {} to {}GB.".format(gpu, gpu_config['gpu_mem']))
-                    tf.config.experimental.set_virtual_device_configuration(gpu,
-                       [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=gpu_config['gpu_mem']*1024)])
-                else:
-                    tf.config.experimental.set_memory_growth(gpu, True)
-            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-        except RuntimeError as e:
-            print(e)
+        gpu_multiply = len(gpus)
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(len(gpus), "Physical GPUs found")
         if len(gpus) > 1:
-            use_strategy = tf.distribute.MirroredStrategy()
-            #use_strategy = tf.distribute.MultiWorkerMirroredStrategy()
+            # use_strategy = tf.distribute.MirroredStrategy()
+            use_strategy = tf.distribute.MultiWorkerMirroredStrategy()
             #use_strategy =  tf.distribute.experimental.CentralStorageStrategy()
         else:
             use_strategy = tf.distribute.get_strategy()
     else:
         use_strategy = tf.distribute.get_strategy()
-        logical_gpus = []
+        gpu_multiply = 1
         print("No GPUs found")
 
     # set up mlflow experiment id
@@ -103,12 +116,13 @@ def main(cfg: DictConfig) -> None:
         checkpoint_path = 'tmp_checkpoints'
         with use_strategy.scope():
             # load datasets 
-            train_data, val_data = compose_datasets(cfg["tf_dataset_cfg"], len(logical_gpus), input_dataset_cfg)
+            train_data, val_data = compose_datasets(cfg, gpu_multiply, input_dataset_cfg)
 
             # define model
             feature_name_to_idx = {}
             for feature_type, feature_names in input_dataset_cfg['feature_names'].items():
                 feature_name_to_idx[feature_type] = {name: i for i, name in enumerate(feature_names)}
+                
             if cfg["model"]["type"] == 'taco_net':
                 model = TacoNet(feature_name_to_idx, cfg["model"]["kwargs"]["encoder"], cfg["model"]["kwargs"]["decoder"])
             elif cfg["model"]["type"] == 'transformer':
@@ -162,11 +176,15 @@ def main(cfg: DictConfig) -> None:
                 model = ParticleNet(feature_name_to_idx, cfg['model']['kwargs']['encoder'], cfg['model']['kwargs']['decoder'])
             else:
                 raise RuntimeError('Failed to infer model type')
-            iterer = iter(train_data)
-            X_, _ = next(iterer)
-            out1 = model(X_, training=False) # init it for correct autologging with mlflow
-            # X2_, _ = next(iterer)
-            # out2 = model(X2_) # init it for correct autologging with mlflow
+            
+            # Currently hardcoded sizes
+            input_shapes = [
+                (None, None, 35),  # First feature tensor
+                (None, None, 74),  # Second feature tensor
+                (None, None, 36),  # Third feature tensor 
+                (None, 1, 43)      # Global features tensor
+            ]
+            model.build(input_shapes)
 
             # LR schedule
             if cfg['schedule'] is None: 
@@ -224,7 +242,7 @@ def main(cfg: DictConfig) -> None:
 
             path_to_hydra_logs = HydraConfig.get().run.dir
             tensorboard_logdir = f'{path_to_hydra_logs}/custom_tensorboard_logs'
-            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (10, 110))
+            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_logdir, profile_batch = (10, 20))
 
             callbacks = [early_stopping, model_checkpoint, tensorboard_callback]
             # callbacks = [early_stopping, model_checkpoint] #, checkpointing]
@@ -235,8 +253,7 @@ def main(cfg: DictConfig) -> None:
                         loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False), 
                         metrics=['accuracy', tf.keras.metrics.AUC(from_logits=False)])
         start_time = time.time()
-        model.fit(train_data, validation_data=val_data, epochs=cfg["n_epochs"], callbacks=callbacks, verbose=2) #, steps_per_epoch=1000)
-        # model.fit(train_data, validation_data=val_data, epochs=1, callbacks=callbacks, verbose=1, steps_per_epoch=111, validation_steps=111)
+        model.fit(train_data, validation_data=val_data, epochs=cfg["n_epochs"], callbacks=callbacks, verbose=1) #, steps_per_epoch=300, validation_steps=300)
         end_time = time.time()
         print("Runtime: {}".format(end_time-start_time))
         # log info

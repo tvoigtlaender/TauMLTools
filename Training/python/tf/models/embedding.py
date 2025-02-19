@@ -14,6 +14,7 @@ class FeatureEmbedding(tf.keras.layers.Layer):
         self.dense_out = [Dense(out_dim, activation=activation) for _ in range(self.n_particle_types)]
         self.shared_embedding = Embedding(shared_cat_dim_in, shared_cat_dim_out)
         
+    @tf.function
     def call(self, inputs):
         outputs = []
         for i, x in enumerate(inputs): # NB: assumes that len(inputs)==len(feature_idx_to_select), so make sure to align this in the model call()  

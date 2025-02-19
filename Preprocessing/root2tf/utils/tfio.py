@@ -84,3 +84,47 @@ def serialize_spec(spec):
         return list(serialize_spec(value) for value in spec)
     else:
         raise ValueError(f"Unsupported spec type: {type(spec)} in {spec}")
+
+def parse_tfrecord(example_proto, dataset_spec):
+    """Parse the TFRecord example."""
+    feature_description = {
+        'targets': tf.io.VarLenFeature(tf.int64)
+    }
+    is_ragged = []
+    dimensions = []
+    for col_i, collection_spec in enumerate(dataset_spec[:-1]):
+        dimensions.append(collection_spec["shape"][-1])
+        if (len(collection_spec["shape"]) == 2) and (collection_spec.get("ragged_rank")):
+            is_ragged.append(True)
+            feature_description.update({
+                f'collection_{col_i}_rowlens': tf.io.VarLenFeature(tf.int64),
+            })
+        elif (len(collection_spec["shape"]) == 1) and not (collection_spec.get("ragged_rank")):
+            is_ragged.append(False)
+        else:
+            raise ValueError(f"Unexpected element specification: {collection_spec}")
+        feature_description.update({
+            f'collection_{col_i}_values': tf.io.VarLenFeature(tf.float32),
+        })
+    # Add global features and targets
+    parsed = tf.io.parse_single_example(example_proto, feature_description)
+    feature_tensors = []
+    for col_i, (dim, is_ragged) in enumerate(zip(dimensions, is_ragged)):
+        if is_ragged:
+            values = parsed[f'collection_{col_i}_values'].values
+            rowlens = tf.cast(parsed[f'collection_{col_i}_rowlens'].values, tf.int64)
+            tensor = tf.squeeze(tf.RaggedTensor.from_row_lengths(tf.reshape(values, [-1, dim]),rowlens), axis=0)
+            feature_tensors.append(tensor)
+        else:
+            feature_tensors.append(parsed[f'collection_{col_i}_values'])
+    targets = parsed['targets']
+    return tuple(feature_tensors + [targets])
+
+def read_tfrecord(filename, element_spec):
+    """Read from a TFRecord file and return a dataset."""
+    raw_dataset = tf.data.TFRecordDataset(filename, compression_type='GZIP')
+    parsed_dataset = raw_dataset.map(
+        lambda x: parse_tfrecord(x, element_spec), 
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
+    return parsed_dataset
