@@ -2,8 +2,8 @@ import numpy as np
 from mass_copy import remote_glob
 import yaml
 
-path = "root://cmsdcache-kit-disk.gridka.de//store/user/tvoigtlaender/TAUML/january_2025_V2/ShuffleMergeSpectral_*"
-cfg_file = "root://cmsdcache-kit-disk.gridka.de//store/user/tvoigtlaender/TAUML/january_2025_V2/cfg.yaml"
+path = "root://cmsdcache-kit-disk.gridka.de//store/user/tvoigtlaender/TAUML/january_2025_V5/RootToTF/ShuffleMergeSpectral_*"
+cfg_file = "root://cmsdcache-kit-disk.gridka.de//store/user/tvoigtlaender/TAUML/january_2025_V5/RootToTF/cfg.yaml"
 
 all_files = remote_glob(path)
 
