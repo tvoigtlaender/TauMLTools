@@ -26,15 +26,18 @@ def compose_datasets(cfg, n_gpu, input_dataset_cfg):
     else:
         global_batch_multiplier = n_gpu
         
-    if tf_dataset_cfg['smart_batching_step'] is None:
+    if tf_dataset_cfg['batching'] == "standard":
         train_data = train_data.batch(tf_dataset_cfg["train_batch_size"] * global_batch_multiplier)
         val_data = val_data.batch(tf_dataset_cfg["val_batch_size"] * global_batch_multiplier)
-    else:
+    elif tf_dataset_cfg['batching'] == "smart":
         train_data, val_data = _smart_batch_V2(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
-        # train_data, val_data = _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
         # train_data, val_data = _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
+    elif tf_dataset_cfg['batching'] == "token":
+        train_data, val_data = _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg)
         # if tf_dataset_cfg['smart_batching_step'] is not None:
         #     train_data, val_data = _add_weights_by_size(train_data, val_data)
+    else:
+        raise ValueError(f"Unsupported batching method: {tf_dataset_cfg['batching']}")
 
     # Add axis to global collection and make it ragged
     if "global" in list(input_dataset_cfg['feature_names'].keys()):
@@ -68,52 +71,15 @@ def compose_datasets(cfg, n_gpu, input_dataset_cfg):
     )
     
     # prefetch
-    train_data = train_data.prefetch(tf.data.experimental.AUTOTUNE)
-    val_data = val_data.prefetch(tf.data.experimental.AUTOTUNE)
-    # options = tf.data.Options()
+    train_data = train_data.prefetch(n_gpu*2)
+    val_data = val_data.prefetch(n_gpu*2)
+    # train_data = train_data.prefetch(tf.data.experimental.AUTOTUNE)
+    # val_data = val_data.prefetch(tf.data.experimental.AUTOTUNE)
+    options = tf.data.Options()
+    options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
     # options.threading.private_threadpool_size = tf_dataset_cfg["n_threads"]
-    # train_data = train_data.with_options(options)
-    # val_data = val_data.with_options(options)
-
-    return train_data, val_data
-
-def _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
-    # will do smart batching based only on the sequence lengths of the **first** element (assume it to be PF candidate block)
-    # NB: careful when dropping whole blocks in `embedding.yaml` -> change smart batching id here accordingly
-    element_length_func = lambda *elements: tf.shape(elements[0])[0]
-
-    bucket_boundaries = np.arange(
-        tf_dataset_cfg['sequence_length_dist_start'],
-        tf_dataset_cfg['sequence_length_dist_end'],
-        tf_dataset_cfg['smart_batching_step']
-    )
-    
-    def _element_to_bucket_id(*args):
-        seq_length = element_length_func(*args)
-        boundaries = list(bucket_boundaries)
-        buckets_min = [np.iinfo(np.int32).min] + boundaries
-        buckets_max = boundaries + [np.iinfo(np.int32).max]
-        conditions_c = math_ops.logical_and(
-            math_ops.less_equal(buckets_min, seq_length),
-            math_ops.less(seq_length, buckets_max)
-        )
-        bucket_id = math_ops.reduce_min(array_ops.where(conditions_c))
-        return bucket_id
-    
-    def _reduce_func(unused_arg, dataset, batch_size):
-        return dataset.batch(batch_size)
-
-    train_data = train_data.group_by_window(
-        key_func=_element_to_bucket_id,
-        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['train_batch_size'] * global_batch_multiplier),
-        window_size=tf_dataset_cfg['train_batch_size'] * global_batch_multiplier
-    ).shuffle(int(tf_dataset_cfg['shuffle_smart_buffer_size'] / global_batch_multiplier))
-
-    val_data = val_data.group_by_window(
-        key_func=_element_to_bucket_id,
-        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['val_batch_size'] * global_batch_multiplier),
-        window_size=tf_dataset_cfg['val_batch_size'] * global_batch_multiplier
-    ).shuffle(int(tf_dataset_cfg['shuffle_smart_buffer_size'] / global_batch_multiplier))
+    train_data = train_data.with_options(options)
+    val_data = val_data.with_options(options)
 
     return train_data, val_data
 
@@ -203,6 +169,46 @@ def _token_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
     ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
     return bucketed_train_dataset, bucketed_val_dataset
 
+def _smart_batch(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
+    # will do smart batching based only on the sequence lengths of the **first** element (assume it to be PF candidate block)
+    # NB: careful when dropping whole blocks in `embedding.yaml` -> change smart batching id here accordingly
+    element_length_func = lambda *elements: tf.shape(elements[0])[0]
+
+    bucket_boundaries = np.arange(
+        tf_dataset_cfg['sequence_length_dist_start'],
+        tf_dataset_cfg['sequence_length_dist_end'],
+        tf_dataset_cfg['smart_batching_step']
+    )
+    
+    def _element_to_bucket_id(*args):
+        seq_length = element_length_func(*args)
+        boundaries = list(bucket_boundaries)
+        buckets_min = [np.iinfo(np.int32).min] + boundaries
+        buckets_max = boundaries + [np.iinfo(np.int32).max]
+        conditions_c = math_ops.logical_and(
+            math_ops.less_equal(buckets_min, seq_length),
+            math_ops.less(seq_length, buckets_max)
+        )
+        bucket_id = math_ops.reduce_min(array_ops.where(conditions_c))
+        return bucket_id
+    
+    def _reduce_func(unused_arg, dataset, batch_size):
+        return dataset.batch(batch_size)
+
+    train_data = train_data.group_by_window(
+        key_func=_element_to_bucket_id,
+        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['train_batch_size'] * global_batch_multiplier),
+        window_size=tf_dataset_cfg['train_batch_size'] * global_batch_multiplier
+    ).shuffle(int(tf_dataset_cfg['shuffle_smart_buffer_size'] / global_batch_multiplier))
+
+    val_data = val_data.group_by_window(
+        key_func=_element_to_bucket_id,
+        reduce_func=lambda unused_arg, dataset: _reduce_func(unused_arg, dataset, tf_dataset_cfg['val_batch_size'] * global_batch_multiplier),
+        window_size=tf_dataset_cfg['val_batch_size'] * global_batch_multiplier
+    ).shuffle(int(tf_dataset_cfg['shuffle_smart_buffer_size'] / global_batch_multiplier))
+
+    return train_data, val_data
+
 def _smart_batch_V2(train_data, val_data, global_batch_multiplier, tf_dataset_cfg):
     bucket_boundaries = np.arange(
         tf_dataset_cfg['sequence_length_dist_start']+tf_dataset_cfg['smart_batching_step'],
@@ -211,22 +217,27 @@ def _smart_batch_V2(train_data, val_data, global_batch_multiplier, tf_dataset_cf
     )
     train_batch_sizes = [tf_dataset_cfg['train_batch_size'] * global_batch_multiplier] * (len(bucket_boundaries) + 1)
     val_batch_sizes = [tf_dataset_cfg['val_batch_size'] * global_batch_multiplier] * (len(bucket_boundaries) + 1)
-    # Bucket the training dataset by sequence length
-    bucketed_train_dataset = train_data.bucket_by_sequence_length(
-        element_length_fn,
-        bucket_boundaries=bucket_boundaries,  
-        bucket_batch_sizes=train_batch_sizes, 
-        no_padding=True
-    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
-    # Bucket the validation dataset by sequence length
-    bucketed_val_dataset = val_data.bucket_by_sequence_length(
-        element_length_fn,
-        bucket_boundaries=bucket_boundaries,  
-        bucket_batch_sizes=val_batch_sizes,
-        # bucket_batch_sizes=val_batch_sizes,
-        no_padding=True
-    ).shuffle(tf_dataset_cfg['shuffle_smart_buffer_size'])
-    return bucketed_train_dataset, bucketed_val_dataset
+
+    @tf.function #(jit_compile=True)
+    def apply_bucketing(dataset, batch_sizes, is_training=True):
+        bucketed_dataset = dataset.bucket_by_sequence_length(
+            element_length_fn,
+            bucket_boundaries=bucket_boundaries,
+            bucket_batch_sizes=batch_sizes,
+            no_padding=True,
+            drop_remainder=is_training  # Drop incomplete batches only during training
+        )
+        # Only shuffle for training
+        if is_training:
+            shuffle_size = tf_dataset_cfg['shuffle_smart_buffer_size']
+            bucketed_dataset = bucketed_dataset.shuffle(shuffle_size)
+        return bucketed_dataset
+
+    # Apply bucketing with prefetch
+    train_dataset = apply_bucketing(train_data, train_batch_sizes, True)
+    val_dataset = apply_bucketing(val_data, val_batch_sizes, False)
+    
+    return train_dataset, val_dataset
 
 def load_data(cfg, input_dataset_cfg):
     tf_dataset_cfg=cfg["tf_dataset_cfg"]    
@@ -304,15 +315,30 @@ def scale_data(train_data, val_data, cfg, input_dataset_cfg):
             scaling_means[i_col].append(merged_scaler_data[collection][variable]["mean"])
             scaling_stds[i_col].append(merged_scaler_data[collection][variable]["std"])
 
-    @tf.function
+    # Convert lists to tf.constant with proper shape and dtype
+    scaling_means = [tf.reshape(tf.constant(mean, dtype=tf.float32), [1, 1, -1]) for mean in scaling_means]
+    scaling_stds = [tf.reshape(tf.constant(std, dtype=tf.float32), [1, 1, -1]) for std in scaling_stds]
+
+    @tf.function #(jit_compile=True)
     def scale_tensors(*tensors):
-        scaled_dat = []
-        for tensor, mean, std in zip(tensors[:-1], scaling_means, scaling_stds):
-            scaled_dat.append((tensor - mean) / std)
-        return tuple(scaled_dat + [tensors[-1]])
+        # Process each feature tensor separately
+        scaled_features = []
+        for feature, mean, std in zip(tensors[:-1], scaling_means, scaling_stds):
+            # Scale the feature tensor
+            scaled_features.append((feature - mean) / std)
+        
+        # Return scaled features and original labels
+        return tuple(scaled_features) + (tensors[-1],)
             
-    train_data = train_data.map(scale_tensors)
-    val_data = val_data.map(scale_tensors)
+    # Apply scaling with multiple parallel calls
+    train_data = train_data.map(
+        scale_tensors,
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
+    val_data = val_data.map(
+        scale_tensors,
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
     return train_data, val_data
 
 def _tfsave_load_datasets(files, element_spec=None):
@@ -441,8 +467,12 @@ def _read_tfrecord(filenames, element_spec):
     """Read from a TFRecord file and return a dataset."""
     filenames_ds = tf.data.Dataset.from_tensor_slices(filenames).shuffle(len(filenames))
     interleaved_dataset = filenames_ds.interleave(
-        lambda filenames: tf.data.TFRecordDataset(filenames, compression_type='GZIP'), 
-        cycle_length=8,  # Number of parallel file reads
+        lambda filenames: tf.data.TFRecordDataset(
+            filenames, 
+            compression_type='GZIP', 
+            num_parallel_reads=tf.data.AUTOTUNE
+        ), 
+        cycle_length=tf.data.AUTOTUNE,  # Number of parallel file reads
         num_parallel_calls=tf.data.AUTOTUNE
     )
     parsed_dataset = interleaved_dataset.map(

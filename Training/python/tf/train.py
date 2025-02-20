@@ -68,12 +68,9 @@ def main(cfg: DictConfig) -> None:
             ))
         print("Using {} for intra op parallelism and {} for inter op parallelism.".format(intra_threads, inter_threads))
         # Overwrite for solo TOpAS
-        # tf.config.threading.set_intra_op_parallelism_threads(intra_threads) 
-        # tf.config.threading.set_inter_op_parallelism_threads(inter_threads)
-        tf.config.threading.set_inter_op_parallelism_threads(25)
-        tf.config.threading.set_intra_op_parallelism_threads(255)
+        tf.config.threading.set_intra_op_parallelism_threads(intra_threads) 
+        tf.config.threading.set_inter_op_parallelism_threads(inter_threads)
         tf.config.set_soft_device_placement(True)
-        tf.config.optimizer.set_jit(True)
     else:
         print("No cpu config set up. Leaving as is.")
 
@@ -85,9 +82,9 @@ def main(cfg: DictConfig) -> None:
             tf.config.experimental.set_memory_growth(gpu, True)
         print(len(gpus), "Physical GPUs found")
         if len(gpus) > 1:
-            # use_strategy = tf.distribute.MirroredStrategy()
-            use_strategy = tf.distribute.MultiWorkerMirroredStrategy()
-            #use_strategy =  tf.distribute.experimental.CentralStorageStrategy()
+            use_strategy = tf.distribute.MirroredStrategy()
+            # use_strategy = tf.distribute.MultiWorkerMirroredStrategy()
+            # use_strategy =  tf.distribute.experimental.CentralStorageStrategy()
         else:
             use_strategy = tf.distribute.get_strategy()
     else:
