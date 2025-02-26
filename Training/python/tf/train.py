@@ -217,7 +217,8 @@ def main(cfg: DictConfig) -> None:
             # callbacks, compile, fit
             early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=cfg["min_delta"], patience=cfg["patience"], mode='auto', restore_best_weights=True)
             model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-                filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}",
+                # filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}",
+                filepath=checkpoint_path + "/" + "epoch_{epoch:02d}---val_loss_{val_loss:.3f}.keras",
                 save_weights_only=False,
                 monitor='val_loss',
                 mode='min',

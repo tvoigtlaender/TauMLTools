@@ -20,12 +20,9 @@ tf_dataset_cfg:
     training: "data2/train/"
     validation: "data2/val/"
     dataset_cfg: "data2/cfg.yaml"
-  # datasets_location: 
-  #   training: "data2/train/*"
-  #   validation: "data2/val/*"
-  #   dataset_cfg: "data2/cfg.yaml"
   combine_via: interleave # options: interleave, sampling
   n_threads: 10 # without controlling it may throw thread limit exception
+  batching: smart # standard // smart // token
   # smart_batching_step: null # null to disable smart batching and use a standard one
   smart_batching_step: 10 # null to disable smart batching and use a standard one
   sequence_length_dist_start: 0 # for smart batching
@@ -36,12 +33,10 @@ tf_dataset_cfg:
   shuffle_buffer_size: 4000 # null to not shuffle
   shuffle_smart_buffer_size: 100
   cache: null # null to not cache the training dataset
-  # train_batch_size: 128
-  # val_batch_size: 128
-  train_batch_size: 1024
-  val_batch_size: 1024
+  train_batch_size: 400
+  val_batch_size: 800
   classes: ["tau", "e", "mu", "jet"] # will pick only those labels (in this order)
-  scaler: False
+  scaler: True
 
 # LR schedule
 # schedule: dynamic # custom // null // decrease
@@ -68,10 +63,16 @@ min_delta: 0.0001
 patience: 10
 
 # GPU settings
-# gpu: "0,1,2,3,4,5,6,7"
+gpu: ""
+# gpu: "0,1" #,2,3,4,5,6,7"
+#"0,1"
+#,2,3,4,5,6,7"
 
 # CPU settings
 # cpu:
-#   cores: 255
-  # intra: 383
+  # cores: 255
+  # intra: 128
   # inter: 127
+  # cores: 16
+  # intra: 16
+  # inter: 16
